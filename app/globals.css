@@ -124,3 +124,167 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* --- Pixel-style UI --- */
+
+:root {
+  --pixel-bg: #1a1a2e;
+  --pixel-panel: #16213e;
+  --pixel-border: #0f3460;
+  --pixel-accent: #e94560;
+  --pixel-green: #4ade80;
+  --pixel-yellow: #facc15;
+  --pixel-red: #ef4444;
+  --pixel-text: #e2e8f0;
+  --pixel-muted: #94a3b8;
+  --pixel-font: var(--font-pixel), "Press Start 2P", monospace;
+}
+
+img,
+canvas {
+  image-rendering: pixelated;
+}
+
+.pixel-panel {
+  background: var(--pixel-panel);
+  border: 3px solid var(--pixel-border);
+  color: var(--pixel-text);
+  font-family: var(--pixel-font);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.pixel-button {
+  font-family: var(--pixel-font);
+  font-size: 10px;
+  padding: 8px 16px;
+  border: 3px solid var(--pixel-border);
+  background: var(--pixel-panel);
+  color: var(--pixel-text);
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: background 0.1s;
+}
+
+.pixel-button:hover:not(:disabled) {
+  background: var(--pixel-border);
+}
+
+.pixel-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pixel-button--primary {
+  background: var(--pixel-accent);
+  border-color: var(--pixel-accent);
+}
+
+.pixel-button--primary:hover:not(:disabled) {
+  background: #c7374e;
+}
+
+.pixel-input {
+  font-family: var(--pixel-font);
+  font-size: 10px;
+  padding: 8px 12px;
+  border: 3px solid var(--pixel-border);
+  background: #0d1b2a;
+  color: var(--pixel-text);
+  resize: vertical;
+  width: 100%;
+  min-height: 60px;
+}
+
+.pixel-input:focus {
+  outline: none;
+  border-color: var(--pixel-accent);
+}
+
+.pixel-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 0;
+}
+
+.pixel-dot--green {
+  background: var(--pixel-green);
+  box-shadow: 0 0 6px var(--pixel-green);
+}
+
+.pixel-dot--yellow {
+  background: var(--pixel-yellow);
+  box-shadow: 0 0 6px var(--pixel-yellow);
+}
+
+.pixel-dot--red {
+  background: var(--pixel-red);
+  box-shadow: 0 0 6px var(--pixel-red);
+}
+
+.pixel-dot--gray {
+  background: var(--pixel-muted);
+}
+
+.pixel-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 42px;
+  font-size: 22px;
+  line-height: 1;
+  border: 3px solid var(--pixel-border);
+  background: var(--pixel-panel);
+  color: var(--pixel-text);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  font-family: sans-serif;
+  transition: background 0.1s;
+}
+
+.pixel-icon-btn:hover:not(:disabled) {
+  background: var(--pixel-border);
+}
+
+.pixel-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pixel-icon-btn--primary {
+  background: var(--pixel-accent);
+  border-color: var(--pixel-accent);
+}
+
+.pixel-icon-btn--primary:hover:not(:disabled) {
+  background: #c7374e;
+}
+
+/* Larger icon buttons for chat input controls only */
+.pixel-chat-icon-btn {
+  min-width: 46px;
+  min-height: 46px;
+  font-size: 24px;
+}
+
+/* Chat composer input should align with action buttons */
+.pixel-chat-input {
+  min-height: 46px;
+  height: 46px;
+  padding: 10px 12px;
+  resize: none;
+}
+
+@keyframes pixel-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.pixel-cursor {
+  display: inline;
+  color: var(--pixel-green);
+  animation: pixel-blink 0.8s step-end infinite;
+}

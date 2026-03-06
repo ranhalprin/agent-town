@@ -13,7 +13,7 @@ export class Player {
   sprite: Phaser.Physics.Arcade.Sprite;
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd: Record<string, Phaser.Input.Keyboard.Key>;
-  private facing: Direction = "down";
+  private facing: Direction = "left";
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     // Create animations once
@@ -37,7 +37,7 @@ export class Player {
     }) as Record<string, Phaser.Input.Keyboard.Key>;
 
     // Start idle
-    this.sprite.anims.play("idle-down");
+    this.sprite.anims.play("idle-left");
   }
 
   private createAnimations(scene: Phaser.Scene) {

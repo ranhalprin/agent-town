@@ -33,5 +33,11 @@ export default function PhaserGame() {
     };
   }, []);
 
-  return <div ref={containerRef} />;
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full"
+      style={{ imageRendering: "pixelated" }}
+    />
+  );
 }
