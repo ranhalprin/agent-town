@@ -27,6 +27,7 @@ export class OfficeScene extends Phaser.Scene {
   private promptText: Phaser.GameObjects.Text | null = null;
   private eKey!: Phaser.Input.Keyboard.Key;
   private terminalOpen = false;
+  private gameEventUnsubs: Array<() => void> = [];
 
   /** All worker agents sitting at desks */
   private workers: Worker[] = [];
@@ -117,6 +118,13 @@ export class OfficeScene extends Phaser.Scene {
 
     // Game events
     this.initGameEvents();
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.cleanupGameEvents();
+    });
+    this.events.once(Phaser.Scenes.Events.DESTROY, () => {
+      this.cleanupGameEvents();
+    });
   }
 
   // ── Spawns ───────────────────────────────────────────────
@@ -180,44 +188,53 @@ export class OfficeScene extends Phaser.Scene {
   // ── Game events bridge (React store → Phaser) ──────────
 
   private initGameEvents() {
-    gameEvents.on("task-assigned", (runId: unknown, message: unknown) => {
+    this.cleanupGameEvents();
+
+    this.gameEventUnsubs.push(gameEvents.on("task-assigned", (runId: unknown, message: unknown) => {
       const worker = this.findIdleWorker();
       if (!worker) return;
       worker.assignTask(runId as string, message as string);
       this.runWorkerMap.set(runId as string, worker);
-    });
+    }));
 
-    gameEvents.on("task-bubble", (runId: unknown, text: unknown, ttl: unknown) => {
+    this.gameEventUnsubs.push(gameEvents.on("task-bubble", (runId: unknown, text: unknown, ttl: unknown) => {
       const worker = this.runWorkerMap.get(runId as string);
       if (worker) worker.showBubble(text as string, (ttl as number) ?? 5000);
-    });
+    }));
 
-    gameEvents.on("task-completed", (runId: unknown) => {
+    this.gameEventUnsubs.push(gameEvents.on("task-completed", (runId: unknown) => {
       const worker = this.runWorkerMap.get(runId as string);
       if (worker) {
         worker.completeTask();
         this.runWorkerMap.delete(runId as string);
       }
-    });
+    }));
 
-    gameEvents.on("task-failed", (runId: unknown) => {
+    this.gameEventUnsubs.push(gameEvents.on("task-failed", (runId: unknown) => {
       const worker = this.runWorkerMap.get(runId as string);
       if (worker) {
         worker.failTask();
         this.runWorkerMap.delete(runId as string);
       }
-    });
+    }));
 
-    gameEvents.on("subagent-assigned", (runId: unknown, parentRunId: unknown, label: unknown) => {
+    this.gameEventUnsubs.push(gameEvents.on("subagent-assigned", (runId: unknown, parentRunId: unknown, label: unknown) => {
       const worker = this.findIdleWorker();
       if (!worker) return;
       worker.assignTask(runId as string, `[Sub] ${label as string}`);
       this.runWorkerMap.set(runId as string, worker);
-    });
+    }));
 
-    gameEvents.on("terminal-closed", () => {
+    this.gameEventUnsubs.push(gameEvents.on("terminal-closed", () => {
       this.terminalOpen = false;
-    });
+    }));
+  }
+
+  private cleanupGameEvents() {
+    for (const unsub of this.gameEventUnsubs) {
+      unsub();
+    }
+    this.gameEventUnsubs = [];
   }
 
   private findIdleWorker(): Worker | null {

@@ -640,7 +640,7 @@
         {
          "columns":16,
          "firstgid":1,
-         "image":"..\/..\/..\/..\/..\/Pictures\/ModernAssets\/Modern_Office_Revamped_v1.2\/1_Room_Builder_Office\/Room_Builder_Office_48x48.png",
+         "image":"..\/tilesets\/Room_Builder_Office_48x48.png",
          "imageheight":672,
          "imagewidth":768,
          "margin":0,
@@ -653,7 +653,7 @@
         {
          "columns":16,
          "firstgid":225,
-         "image":"..\/..\/..\/..\/..\/Pictures\/ModernAssets\/Modern_Office_Revamped_v1.2\/Modern_Office_48x48.png",
+         "image":"..\/tilesets\/Modern_Office_48x48.png",
          "imageheight":2544,
          "imagewidth":768,
          "margin":0,

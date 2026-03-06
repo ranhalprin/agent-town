@@ -20,6 +20,7 @@ import type {
 } from "@/types/game";
 import { GatewayClient, type GatewayFrame } from "./gateway";
 import { gameEvents } from "./events";
+import { getDefaultGatewayUrl } from "./utils";
 
 // ── localStorage helpers ──────────────────────────────────
 
@@ -187,7 +188,7 @@ export function useStudio(): StudioContextValue {
 
 // ── Provider ──────────────────────────────────────────────
 
-const DEFAULT_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? "ws://127.0.0.1:18789/";
+const DEFAULT_URL = getDefaultGatewayUrl();
 const DEFAULT_TOKEN = process.env.NEXT_PUBLIC_GATEWAY_TOKEN ?? "";
 
 const SUBAGENT_KEY_RE = /subagent:/;
@@ -484,12 +485,20 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const newSession = useCallback(() => {
+    const shouldReconnect = clientRef.current?.status === "connected";
+
     bubbleAccum.clear();
     seenStarts.clear();
+    clientRef.current?.disconnect();
+    clientRef.current = null;
     dispatchRef.current({ type: "NEW_SESSION" });
     lsSet(LS_TASKS, []);
     lsSet(LS_CHAT, []);
-  }, []);
+
+    if (shouldReconnect) {
+      connectImpl(configRef.current);
+    }
+  }, [connectImpl]);
 
   return React.createElement(
     StudioContext.Provider,

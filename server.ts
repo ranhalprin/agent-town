@@ -8,7 +8,7 @@
 
 import { createServer } from "http";
 import next from "next";
-import { WebSocket, WebSocketServer } from "ws";
+import { RawData, WebSocket, WebSocketServer } from "ws";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT ?? "3000", 10);
@@ -50,9 +50,13 @@ app.prepare().then(() => {
 function proxyWebSocket(clientWs: WebSocket) {
   // Connect to the real gateway
   const upstream = new WebSocket(GATEWAY_URL);
+  const bufferedMessages: Array<{ data: RawData; isBinary: boolean }> = [];
 
   upstream.on("open", () => {
-    // Forward buffered messages from client
+    for (const message of bufferedMessages) {
+      upstream.send(message.data, { binary: message.isBinary });
+    }
+    bufferedMessages.length = 0;
   });
 
   upstream.on("message", (data, isBinary) => {
@@ -78,10 +82,16 @@ function proxyWebSocket(clientWs: WebSocket) {
   clientWs.on("message", (data, isBinary) => {
     if (upstream.readyState === WebSocket.OPEN) {
       upstream.send(data, { binary: isBinary });
+      return;
+    }
+
+    if (upstream.readyState === WebSocket.CONNECTING) {
+      bufferedMessages.push({ data, isBinary });
     }
   });
 
   clientWs.on("close", () => {
+    bufferedMessages.length = 0;
     if (upstream.readyState === WebSocket.OPEN) {
       upstream.close();
     }

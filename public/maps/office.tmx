@@ -4,10 +4,10 @@
   <export target="office.json" format="json"/>
  </editorsettings>
  <tileset firstgid="1" name="room_builder" tilewidth="48" tileheight="48" tilecount="224" columns="16">
-  <image source="../../../../../Pictures/ModernAssets/Modern_Office_Revamped_v1.2/1_Room_Builder_Office/Room_Builder_Office_48x48.png" width="768" height="672"/>
+  <image source="../tilesets/Room_Builder_Office_48x48.png" width="768" height="672"/>
  </tileset>
  <tileset firstgid="225" name="modern_office" tilewidth="48" tileheight="48" tilecount="848" columns="16">
-  <image source="../../../../../Pictures/ModernAssets/Modern_Office_Revamped_v1.2/Modern_Office_48x48.png" width="768" height="2544"/>
+  <image source="../tilesets/Modern_Office_48x48.png" width="768" height="2544"/>
  </tileset>
  <layer id="7" name="floor" width="27" height="20">
   <data encoding="csv">

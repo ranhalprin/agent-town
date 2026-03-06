@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useStudio } from "@/lib/store";
 import type { ConnectionStatus } from "@/types/game";
+import { getDefaultGatewayUrl } from "@/lib/utils";
 
 const LS_CONFIG = "agent-world:gateway-config";
-const DEFAULT_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? "ws://127.0.0.1:18789/";
+const DEFAULT_URL = getDefaultGatewayUrl();
 const DEFAULT_TOKEN = process.env.NEXT_PUBLIC_GATEWAY_TOKEN ?? "";
 
 const STATUS_LABELS: Record<ConnectionStatus, string> = {
@@ -20,19 +21,22 @@ export default function StatusHUD() {
   const { connection, tasks } = state;
 
   const [showConfig, setShowConfig] = useState(false);
-  const [url, setUrl] = useState(DEFAULT_URL);
-  const [token, setToken] = useState(DEFAULT_TOKEN);
-
-  useEffect(() => {
+  const [storedConfig] = useState(() => {
     try {
       const raw = localStorage.getItem(LS_CONFIG);
       if (raw) {
-        const cfg = JSON.parse(raw);
-        if (cfg.url) setUrl(cfg.url);
-        if (cfg.token) setToken(cfg.token);
+        const cfg = JSON.parse(raw) as { url?: string; token?: string };
+        return {
+          url: cfg.url || DEFAULT_URL,
+          token: cfg.token || DEFAULT_TOKEN,
+        };
       }
     } catch {}
-  }, []);
+
+    return { url: DEFAULT_URL, token: DEFAULT_TOKEN };
+  });
+  const [url, setUrl] = useState(storedConfig.url);
+  const [token, setToken] = useState(storedConfig.token);
 
   const dotClass =
     connection === "connected"
@@ -116,7 +120,7 @@ export default function StatusHUD() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={stopPropagation}
-            placeholder="ws://127.0.0.1:18789/"
+            placeholder={DEFAULT_URL}
             disabled={isConnected || isConnecting}
           />
 
