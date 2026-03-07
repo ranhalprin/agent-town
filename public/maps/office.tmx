@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="27" height="20" tilewidth="48" tileheight="48" infinite="0" nextlayerid="12" nextobjectid="137">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="27" height="20" tilewidth="48" tileheight="48" infinite="0" nextlayerid="12" nextobjectid="143">
  <editorsettings>
   <export target="office.json" format="json"/>
  </editorsettings>
@@ -224,6 +224,21 @@
    <point/>
   </object>
   <object id="130" x="610.9" y="695.19">
+   <point/>
+  </object>
+  <object id="137" x="694.882" y="559.709">
+   <point/>
+  </object>
+  <object id="138" x="839.821" y="560.365">
+   <point/>
+  </object>
+  <object id="139" x="455.696" y="368.076">
+   <point/>
+  </object>
+  <object id="140" x="599.807" y="368.217">
+   <point/>
+  </object>
+  <object id="141" x="744.09" y="367.732">
    <point/>
   </object>
  </objectgroup>
