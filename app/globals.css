@@ -645,6 +645,10 @@ canvas {
   color: var(--pixel-red);
 }
 
+.hud-status--stopped {
+  color: #f97316;
+}
+
 .hud-status--empty {
   color: var(--pixel-muted);
 }

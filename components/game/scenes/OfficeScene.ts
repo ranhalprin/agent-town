@@ -358,6 +358,7 @@ export class OfficeScene extends Phaser.Scene {
         gameEvents.emit("task-ready", runId, message, seatId);
         return;
       }
+      gameEvents.emit("task-routed", runId, worker.seatId, worker.label);
       if (seatId && worker.status === "working" && worker.assignedRunId) {
         gameEvents.emit("task-staged", runId, "queued", worker.seatId);
         worker.enqueueTask(runId, message, () => gameEvents.emit("task-ready", runId, message, worker.seatId));
@@ -399,6 +400,14 @@ export class OfficeScene extends Phaser.Scene {
       const worker = this.runWorkerMap.get(runId);
       if (worker) {
         worker.failTask();
+        this.runWorkerMap.delete(runId);
+      }
+    }));
+
+    this.gameEventUnsubs.push(gameEvents.on("task-aborted", (runId) => {
+      const worker = this.runWorkerMap.get(runId);
+      if (!worker) return;
+      if (worker.abortTask(runId)) {
         this.runWorkerMap.delete(runId);
       }
     }));

@@ -40,6 +40,7 @@ import {
 // ── localStorage helpers ──────────────────────────────────
 
 const CONNECTED_TO_PREFIX = "Connected to ";
+const MAIN_SESSION_KEY = "agent:main:main";
 
 function lsGet<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -110,8 +111,25 @@ function patchTasks(tasks: TaskItem[], taskId: string, patch: Partial<TaskItem>)
   );
 }
 
+function findTask(tasks: TaskItem[], taskId: string) {
+  return tasks.find((task) => task.taskId === taskId || task.runId === taskId);
+}
+
+function mergeSessionChat(
+  existing: ChatMessage[],
+  sessionKey: string,
+  incoming: ChatMessage[],
+) {
+  return [
+    ...existing.filter((message) => message.sessionKey !== sessionKey),
+    ...incoming,
+  ].slice(-MAX_CHAT * MAX_SESSIONS);
+}
+
 function findAssignableSeatIndex(seats: SeatState[]) {
-  const available = seats.findIndex((seat) => seat.assigned && seat.status !== "running");
+  const available = seats.findIndex(
+    (seat) => seat.assigned && seat.status !== "running" && seat.status !== "returning"
+  );
   return available >= 0 ? available : -1;
 }
 
@@ -201,7 +219,8 @@ type Action =
   | { type: "RESTORE"; tasks: TaskItem[]; chatMessages: ChatMessage[]; sessions: SessionRecord[] }
   | { type: "NEW_SESSION"; session: SessionRecord }
   | { type: "SET_SESSIONS"; sessions: SessionRecord[] }
-  | { type: "SWITCH_SESSION"; sessionKey: string; tasks: TaskItem[]; chatMessages: ChatMessage[] };
+  | { type: "HYDRATE_SESSION_CHAT"; sessionKey: string; chatMessages: ChatMessage[] }
+  | { type: "SWITCH_SESSION"; sessionKey: string };
 
 function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
   switch (action.type) {
@@ -223,7 +242,7 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
       }
       return {
         ...state,
-        chatMessages: [...state.chatMessages, action.message].slice(-MAX_CHAT),
+        chatMessages: [...state.chatMessages, action.message].slice(-MAX_CHAT * MAX_SESSIONS),
       };
 
     case "APPEND_DELTA": {
@@ -249,6 +268,7 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
           role: "assistant",
           content: action.delta,
           timestamp: new Date().toISOString(),
+          sessionKey: findTask(state.tasks, action.runId)?.sessionKey ?? MAIN_SESSION_KEY,
           actorName: action.actorName,
           streaming: true,
         });
@@ -279,6 +299,7 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
           role: "assistant",
           content: action.content,
           timestamp: new Date().toISOString(),
+          sessionKey: findTask(state.tasks, action.runId)?.sessionKey ?? MAIN_SESSION_KEY,
           actorName: action.actorName,
           streaming: false,
         });
@@ -399,8 +420,6 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
       const existingSessions = state.sessions.filter((s) => s.key !== action.session.key);
       return {
         ...state,
-        tasks: [],
-        chatMessages: [],
         activeSessionKey: action.session.key,
         sessionMetrics: createEmptySessionMetrics(),
         seats: resetSeatRuntime(state.seats),
@@ -422,11 +441,19 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
       return { ...state, sessions: [...merged, ...localOnly].slice(0, MAX_SESSIONS) };
     }
 
+    case "HYDRATE_SESSION_CHAT":
+      return {
+        ...state,
+        chatMessages: mergeSessionChat(
+          state.chatMessages.filter((m) => !isRedundantConnectionMessage(m)),
+          action.sessionKey,
+          action.chatMessages.filter((m) => !isRedundantConnectionMessage(m)),
+        ),
+      };
+
     case "SWITCH_SESSION":
       return {
         ...state,
-        tasks: action.tasks,
-        chatMessages: action.chatMessages.filter((m) => !isRedundantConnectionMessage(m)),
         activeSessionKey: action.sessionKey,
         sessionMetrics: createEmptySessionMetrics(),
         seats: resetSeatRuntime(state.seats),
@@ -463,7 +490,6 @@ const DEFAULT_URL = getDefaultGatewayUrl();
 const DEFAULT_TOKEN = process.env.NEXT_PUBLIC_GATEWAY_TOKEN ?? "";
 
 const SUBAGENT_KEY_RE = /subagent:/;
-const MAIN_SESSION_KEY = "agent:main:main";
 
 interface SessionListRow {
   key: string;
@@ -509,6 +535,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const dispatchRef = useRef<Dispatch<Action>>(dispatch);
   dispatchRef.current = dispatch;
+  const tasksRef = useRef<TaskItem[]>(state.tasks);
+  tasksRef.current = state.tasks;
   const seatsRef = useRef<SeatState[]>(state.seats);
   seatsRef.current = state.seats;
   const seatConfigRef = useRef<PersistedSeatConfig[]>([]);
@@ -527,6 +555,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const setActiveSessionKey = useCallback((sessionKey?: string) => {
     activeSessionKeyRef.current = sessionKey;
     dispatchRef.current({ type: "SET_ACTIVE_SESSION", sessionKey });
+  }, []);
+
+  const resolveRunSessionKey = useCallback((runId: string, sessionKey?: string) => {
+    return (
+      sessionKey ??
+      findTask(tasksRef.current, runId)?.sessionKey ??
+      activeSessionKeyRef.current ??
+      MAIN_SESSION_KEY
+    );
   }, []);
 
   const loadModelCatalog = useCallback(async (client: GatewayClient) => {
@@ -656,8 +693,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       const isSubagent = sessionKey ? SUBAGENT_KEY_RE.test(sessionKey) : false;
       const data = p.data as Record<string, unknown> | undefined;
       const stream = p.stream as string | undefined;
+      const resolvedSessionKey = resolveRunSessionKey(runId, isSubagent ? undefined : sessionKey);
 
-      if (sessionKey && !isSubagent) {
+      if (sessionKey && !isSubagent && !activeSessionKeyRef.current) {
         setActiveSessionKey(sessionKey);
         scheduleSessionMetricsRefresh();
       }
@@ -681,12 +719,20 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                 id: chatId(), runId, role: "system",
                 content: `Subagent started: ${label}`,
                 timestamp: new Date().toISOString(),
+                sessionKey: resolvedSessionKey,
               },
             });
           } else {
             scheduleSessionMetricsRefresh();
           }
         } else if (data?.phase === "end") {
+          const existingTask = findTask(tasksRef.current, runId);
+          if (existingTask?.status === "stopped") {
+            seenStartsRef.current.delete(runId);
+            bubbleAccumRef.current.delete(runId);
+            scheduleSessionMetricsRefresh(400);
+            return;
+          }
           seenStartsRef.current.delete(runId);
           bubbleAccumRef.current.delete(runId);
           gameEvents.emit("task-completed", runId);
@@ -701,10 +747,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
               id: chatId(), runId, role: "system",
               content: "Task completed",
               timestamp: new Date().toISOString(),
+              sessionKey: resolvedSessionKey,
             },
           });
           scheduleSessionMetricsRefresh(400);
         } else if (data?.phase === "error") {
+          const existingTask = findTask(tasksRef.current, runId);
+          if (existingTask?.status === "stopped") {
+            seenStartsRef.current.delete(runId);
+            bubbleAccumRef.current.delete(runId);
+            scheduleSessionMetricsRefresh(400);
+            return;
+          }
           seenStartsRef.current.delete(runId);
           bubbleAccumRef.current.delete(runId);
           gameEvents.emit("task-failed", runId);
@@ -718,6 +772,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
               id: chatId(), runId, role: "system",
               content: `Task error: ${(data.error as string) ?? "unknown"}`,
               timestamp: new Date().toISOString(),
+              sessionKey: resolvedSessionKey,
             },
           });
           scheduleSessionMetricsRefresh(400);
@@ -739,6 +794,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             message: {
               id: chatId(), runId, role: "tool",
               content: toolName,
+              sessionKey: resolvedSessionKey,
               toolName,
               toolInput: rawInput ? fmtJson(rawInput) : undefined,
               toolOutput: rawOutput ? fmtJson(rawOutput) : undefined,
@@ -770,12 +826,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       const runId = p.runId as string | undefined;
       if (!runId) return;
       const sessionKey = p.sessionKey as string | undefined;
-      if (sessionKey && !SUBAGENT_KEY_RE.test(sessionKey)) {
+      const resolvedSessionKey = resolveRunSessionKey(runId, sessionKey);
+      if (sessionKey && !SUBAGENT_KEY_RE.test(sessionKey) && !activeSessionKeyRef.current) {
         setActiveSessionKey(sessionKey);
       }
 
       const eventState = p.state as string | undefined;
       if (eventState === "final") {
+        const existingTask = findTask(tasksRef.current, runId);
+        if (existingTask?.status === "stopped") {
+          scheduleSessionMetricsRefresh(400);
+          return;
+        }
         const msg = p.message as Record<string, unknown> | undefined;
         const content = msg?.content as Array<Record<string, unknown>> | undefined;
         const text = content?.find((c) => c.type === "text")?.text as string | undefined;
@@ -793,11 +855,25 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         }
         scheduleSessionMetricsRefresh(400);
       } else if (eventState === "error" || eventState === "aborted") {
+        const stopped = eventState === "aborted";
         dispatchRef.current({
-          type: "UPDATE_TASK", taskId: runId, patch: { status: "failed" },
+          type: "UPDATE_TASK",
+          taskId: runId,
+          patch: { status: stopped ? "stopped" : "failed", completedAt: new Date().toISOString() },
         });
-        dispatchRef.current({ type: "SET_SEAT_STATUS", runId, status: "failed" });
-        gameEvents.emit("task-failed", runId);
+        dispatchRef.current({ type: "SET_SEAT_STATUS", runId, status: stopped ? "empty" : "failed" });
+        gameEvents.emit(stopped ? "task-aborted" : "task-failed", runId);
+        dispatchRef.current({
+          type: "APPEND_CHAT",
+          message: {
+            id: chatId(),
+            runId,
+            role: "system",
+            content: stopped ? "Task stopped" : "Task failed",
+            timestamp: new Date().toISOString(),
+            sessionKey: resolvedSessionKey,
+          },
+        });
         scheduleSessionMetricsRefresh(400);
       }
     });
@@ -806,6 +882,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       const f = frame as GatewayFrame;
       const runId = f.payload?.runId as string | undefined;
       if (!runId) return;
+      const existingTask = findTask(tasksRef.current, runId);
+      if (existingTask?.status === "stopped") return;
 
       const status = f.payload?.status as string | undefined;
       if (f.ok && (status === "ok" || status === "completed")) {
@@ -821,7 +899,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         dispatchRef.current({ type: "SET_SEAT_STATUS", runId, status: "failed" });
       }
     });
-  }, [scheduleSessionMetricsRefresh, setActiveSessionKey]);
+  }, [resolveRunSessionKey, scheduleSessionMetricsRefresh, setActiveSessionKey]);
 
   // ── Connect implementation ──
 
@@ -853,6 +931,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
               id: chatId(), runId: "", role: "system",
               content: `Connection failed: ${err.message}`,
               timestamp: new Date().toISOString(),
+              sessionKey: activeSessionKeyRef.current ?? MAIN_SESSION_KEY,
             },
           });
         });
@@ -866,12 +945,19 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     const savedConfig = lsGet<GatewayConfig | null>(LS_CONFIG, null);
     if (savedConfig) configRef.current = savedConfig;
 
-    const tasks = lsGet<TaskItem[]>(LS_TASKS, []);
-    const chat = lsGet<ChatMessage[]>(LS_CHAT, []);
+    const savedActiveKey = lsGet<string | null>(LS_ACTIVE_KEY, null);
+    const fallbackSessionKey = savedActiveKey ?? MAIN_SESSION_KEY;
+    const tasks = lsGet<TaskItem[]>(LS_TASKS, []).map((task) => ({
+      ...task,
+      sessionKey: task.sessionKey ?? fallbackSessionKey,
+    }));
+    const chat = lsGet<ChatMessage[]>(LS_CHAT, []).map((message) => ({
+      ...message,
+      sessionKey: message.sessionKey ?? fallbackSessionKey,
+    }));
     const sessions = lsGet<SessionRecord[]>(LS_SESSIONS, []);
     const seatConfigs = lsGet<PersistedSeatConfig[]>(LS_SEAT_CONFIG, []);
     seatConfigRef.current = seatConfigs;
-    const savedActiveKey = lsGet<string | null>(LS_ACTIVE_KEY, null);
     if (savedActiveKey) {
       activeSessionKeyRef.current = savedActiveKey;
     }
@@ -901,8 +987,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   // ── Persist tasks + chat ──
 
   useEffect(() => {
-    lsSet(LS_TASKS, state.tasks.slice(0, 50));
-    lsSet(LS_CHAT, state.chatMessages.slice(-200));
+    lsSet(LS_TASKS, state.tasks.slice(0, 200));
+    lsSet(LS_CHAT, state.chatMessages.slice(-400));
     lsSet(LS_SESSIONS, state.sessions.slice(0, MAX_SESSIONS));
   }, [state.tasks, state.chatMessages, state.sessions]);
 
@@ -958,7 +1044,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const sendTaskToGateway = useCallback((taskId: string, message: string, seatId?: string) => {
     const client = clientRef.current;
     if (!client || client.status !== "connected") return;
-    const actorName = resolveSeatLabelForTask(seatsRef.current, seatId);
+    const task = findTask(tasksRef.current, taskId);
+    const sessionKey = task?.sessionKey ?? activeSessionKeyRef.current ?? MAIN_SESSION_KEY;
+    const actorName = task?.actorName ?? resolveSeatLabelForTask(seatsRef.current, seatId);
 
     dispatchRef.current({
       type: "UPDATE_TASK",
@@ -977,13 +1065,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       });
     }
 
-    const sessionKey = activeSessionKeyRef.current;
     client
       .request("agent", {
         message,
         agentId: "main",
         idempotencyKey: taskId,
-        ...(sessionKey ? { sessionKey } : {}),
+        sessionKey,
       })
       .then((res: GatewayFrame) => {
         const runId = res.payload?.runId as string | undefined;
@@ -995,7 +1082,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         dispatchRef.current({
           type: "UPDATE_TASK",
           taskId,
-          patch: { status: "running", runId: runId ?? undefined },
+          patch: { status: "running", runId: runId ?? undefined, actorName, seatId },
         });
         dispatchRef.current({
           type: "BIND_SEAT_RUN",
@@ -1024,6 +1111,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             id: chatId(), runId: taskId, role: "system",
             content: `Assign failed: ${err.message}`,
             timestamp: new Date().toISOString(),
+            sessionKey,
           },
         });
       });
@@ -1036,27 +1124,35 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, [sendTaskToGateway]);
 
   useEffect(() => {
+    return gameEvents.on("task-routed", (taskId, seatId, actorName) => {
+      dispatchRef.current({
+        type: "UPDATE_TASK",
+        taskId,
+        patch: { seatId, actorName },
+      });
+    });
+  }, []);
+
+  useEffect(() => {
     return gameEvents.on("task-staged", (taskId, stage, seatId) => {
       dispatchRef.current({
         type: "UPDATE_TASK",
         taskId,
-        patch: { status: stage },
+        patch: { status: stage, seatId },
       });
 
       if (!seatId) return;
 
-      if (stage === "returning") {
-        dispatchRef.current({
-          type: "PATCH_SEAT_RUNTIME",
-          seatId,
-          patch: {
-            status: "returning",
-            runId: taskId,
-            taskSnippet: "Returning to desk...",
-            startedAt: new Date().toISOString(),
-          },
-        });
-      }
+      dispatchRef.current({
+        type: "PATCH_SEAT_RUNTIME",
+        seatId,
+        patch: {
+          status: stage === "returning" ? "returning" : "running",
+          runId: taskId,
+          taskSnippet: stage === "returning" ? "Returning to desk..." : "Queued task",
+          startedAt: new Date().toISOString(),
+        },
+      });
     });
   }, []);
 
@@ -1065,7 +1161,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     if (!client || client.status !== "connected") return;
 
     const taskId = `aw_task_${++taskCounterRef.current}_${Date.now()}`;
-    const actorName = resolveSeatLabelForTask(seatsRef.current, seatId);
+    const sessionKey = activeSessionKeyRef.current ?? MAIN_SESSION_KEY;
+    const actorName = seatId ? resolveSeatLabelForTask(seatsRef.current, seatId) : undefined;
 
     dispatchRef.current({
       type: "ADD_TASK",
@@ -1073,6 +1170,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         taskId,
         message,
         status: "submitted",
+        sessionKey,
+        seatId,
         actorName,
         createdAt: new Date().toISOString(),
       },
@@ -1084,18 +1183,103 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         id: chatId(), runId: taskId, role: "user",
         content: message,
         timestamp: new Date().toISOString(),
+        sessionKey,
       },
-    });
-
-    dispatchRef.current({
-      type: "ASSIGN_SEAT",
-      runId: taskId,
-      taskSnippet: message.slice(0, 28),
-      seatId,
     });
 
     gameEvents.emit("task-assigned", taskId, message, seatId);
   }, []);
+
+  const finalizeStoppedTask = useCallback((runId: string, seatId?: string) => {
+    const task = findTask(tasksRef.current, runId);
+    if (!task || task.status === "stopped" || task.status === "completed") return;
+    dispatchRef.current({
+      type: "UPDATE_TASK",
+      taskId: runId,
+      patch: {
+        status: "stopped",
+        completedAt: new Date().toISOString(),
+        result: task.result ?? "Stopped by user",
+      },
+    });
+    if (seatId) {
+      dispatchRef.current({
+        type: "PATCH_SEAT_RUNTIME",
+        seatId,
+        patch: {
+          status: "empty",
+          runId: undefined,
+          taskSnippet: undefined,
+          startedAt: undefined,
+        },
+      });
+    } else {
+      dispatchRef.current({ type: "SET_SEAT_STATUS", runId, status: "empty" });
+    }
+    dispatchRef.current({
+      type: "APPEND_CHAT",
+      message: {
+        id: chatId(),
+        runId,
+        role: "system",
+        content: "Task stopped",
+        timestamp: new Date().toISOString(),
+        sessionKey: task.sessionKey,
+      },
+    });
+    gameEvents.emit("task-aborted", runId);
+  }, []);
+
+  useEffect(() => {
+    return gameEvents.on("stop-task", async (runId, seatId) => {
+      const task = findTask(tasksRef.current, runId);
+      if (!task) return;
+      if (task.status === "queued" || task.status === "returning" || !task.runId) {
+        finalizeStoppedTask(runId, seatId);
+        return;
+      }
+
+      const client = clientRef.current;
+      if (!client || client.status !== "connected") {
+        finalizeStoppedTask(runId, seatId);
+        return;
+      }
+
+      const attempts: Array<[string, Record<string, unknown>]> = [
+        ["agent.abort", { runId: task.runId }],
+        ["agent.abort", { runId: task.runId, sessionKey: task.sessionKey }],
+        ["agent", {
+          message: "/stop",
+          agentId: "main",
+          sessionKey: task.sessionKey,
+          idempotencyKey: `${task.runId}:stop`,
+        }],
+      ];
+
+      for (const [method, params] of attempts) {
+        try {
+          await client.request(method, params, 10000);
+          finalizeStoppedTask(runId, seatId);
+          scheduleSessionMetricsRefresh(200);
+          return;
+        } catch (error) {
+          console.warn(`[Gateway] ${method} failed:`, error);
+        }
+      }
+
+      dispatchRef.current({
+        type: "APPEND_CHAT",
+        message: {
+          id: chatId(),
+          runId,
+          role: "system",
+          content: "Stop task failed: gateway rejected the stop request",
+          timestamp: new Date().toISOString(),
+          sessionKey: task.sessionKey,
+        },
+      });
+    });
+  }, [finalizeStoppedTask, scheduleSessionMetricsRefresh]);
 
   const loadSessionPreview = useCallback(async (sessionKey: string): Promise<ChatMessage[]> => {
     const client = clientRef.current;
@@ -1128,6 +1312,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             runId: "",
             role: "tool",
             content: item.text,
+            sessionKey,
             toolName: item.text,
             toolOutput: resultParts.length > 0 ? resultParts.join("\n\n---\n\n") : undefined,
             timestamp: new Date().toISOString(),
@@ -1140,6 +1325,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           runId: "",
           role,
           content: item.text,
+          sessionKey,
           timestamp: new Date().toISOString(),
         });
       }
@@ -1163,8 +1349,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
     activeSessionKeyRef.current = newKey;
     dispatchRef.current({ type: "NEW_SESSION", session: record });
-    lsSet(LS_TASKS, []);
-    lsSet(LS_CHAT, []);
     lsSet(LS_ACTIVE_KEY, newKey);
 
     scheduleSessionMetricsRefresh(300);
@@ -1182,14 +1366,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
     if (activeSessionKeyRef.current !== sessionKey) return;
 
-    dispatchRef.current({
-      type: "SWITCH_SESSION",
-      sessionKey,
-      tasks: [],
-      chatMessages: messages,
-    });
-    lsSet(LS_TASKS, []);
-    lsSet(LS_CHAT, messages);
+    dispatchRef.current({ type: "HYDRATE_SESSION_CHAT", sessionKey, chatMessages: messages });
+    dispatchRef.current({ type: "SWITCH_SESSION", sessionKey });
 
     scheduleSessionMetricsRefresh(200);
   }, [scheduleSessionMetricsRefresh, loadSessionPreview]);

@@ -31,6 +31,7 @@ export type TaskStatus =
   | "queued"
   | "returning"
   | "running"
+  | "stopped"
   | "completed"
   | "failed";
 
@@ -39,6 +40,8 @@ export interface TaskItem {
   message: string;
   status: TaskStatus;
   runId?: string;
+  seatId?: string;
+  sessionKey: string;
   actorName?: string;
   result?: string;
   createdAt: string;
@@ -51,6 +54,7 @@ export interface ChatMessage {
   role: "user" | "assistant" | "tool" | "system";
   content: string;
   timestamp: string;
+  sessionKey: string;
   actorName?: string;
   /** true while assistant message is still receiving streaming deltas */
   streaming?: boolean;

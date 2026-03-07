@@ -16,9 +16,17 @@ export default function GameHud() {
   const { state } = useStudio();
   const [openPanel, setOpenPanel] = useState<HudPanelId | null>(null);
   const [seatManagerOpen, setSeatManagerOpen] = useState(false);
+  const activeSessionKey = state.activeSessionKey ?? "agent:main:main";
+  const visibleTasks = useMemo(
+    () => state.tasks.filter((task) => task.sessionKey === activeSessionKey),
+    [activeSessionKey, state.tasks]
+  );
   const visibleMessages = useMemo(
-    () => state.chatMessages.filter(isVisibleChatMessage),
-    [state.chatMessages]
+    () =>
+      state.chatMessages.filter(
+        (message) => message.sessionKey === activeSessionKey && isVisibleChatMessage(message)
+      ),
+    [activeSessionKey, state.chatMessages]
   );
 
   const dockItems: HudDockItem[] = useMemo(
@@ -31,7 +39,7 @@ export default function GameHud() {
     []
   );
 
-  const runningCount = state.tasks.filter(
+  const runningCount = visibleTasks.filter(
     (task) =>
       task.status === "running" ||
       task.status === "submitted" ||
@@ -130,13 +138,13 @@ export default function GameHud() {
             {openPanel === "chat" ? (
               <ChatPanel
                 messages={visibleMessages}
-                tasks={state.tasks}
+                tasks={visibleTasks}
                 isConnected={state.connection === "connected"}
                 sessions={state.sessions}
                 activeSessionKey={state.activeSessionKey}
               />
             ) : null}
-            {openPanel === "tasks" ? <TaskPanel tasks={state.tasks} /> : null}
+            {openPanel === "tasks" ? <TaskPanel tasks={visibleTasks} /> : null}
             {openPanel === "workers" ? (
               <WorkerPanel seats={state.seats} onOpenManager={() => setSeatManagerOpen(true)} />
             ) : null}

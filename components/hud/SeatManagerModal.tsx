@@ -43,30 +43,16 @@ export default function SeatManagerModal({
 }) {
   const { updateSeatConfig } = useStudio();
   const [selectedSeatId, setSelectedSeatId] = useState<string>("");
+  const [draftSeatId, setDraftSeatId] = useState<string>("");
   const [name, setName] = useState("");
   const [roleTitle, setRoleTitle] = useState("");
   const [spriteKey, setSpriteKey] = useState("");
   const [spritePath, setSpritePath] = useState("");
 
-  useEffect(() => {
-    if (!open) return;
-    if (!selectedSeatId || !seats.some((seat) => seat.seatId === selectedSeatId)) {
-      setSelectedSeatId(seats[0]?.seatId ?? "");
-    }
-  }, [open, seats, selectedSeatId]);
-
   const selectedSeat = useMemo(
     () => seats.find((seat) => seat.seatId === selectedSeatId) ?? seats[0],
     [seats, selectedSeatId],
   );
-
-  useEffect(() => {
-    if (!selectedSeat) return;
-    setName(selectedSeat.assigned ? selectedSeat.label : "");
-    setRoleTitle(selectedSeat.roleTitle ?? "");
-    setSpriteKey(selectedSeat.spriteKey ?? WORKER_SPRITES[0]?.key ?? "");
-    setSpritePath(selectedSeat.spritePath ?? WORKER_SPRITES[0]?.path ?? "");
-  }, [selectedSeat]);
 
   useEffect(() => {
     if (!open) return;
@@ -79,18 +65,38 @@ export default function SeatManagerModal({
 
   if (!open || !selectedSeat) return null;
 
+  const usingDraft = draftSeatId === selectedSeat.seatId;
+  const effectiveName = usingDraft ? name : (selectedSeat.assigned ? selectedSeat.label : "");
+  const effectiveRoleTitle = usingDraft ? roleTitle : (selectedSeat.roleTitle ?? "");
+  const effectiveSpriteKey = usingDraft ? spriteKey : (selectedSeat.spriteKey ?? WORKER_SPRITES[0]?.key ?? "");
+  const effectiveSpritePath = usingDraft ? spritePath : (selectedSeat.spritePath ?? WORKER_SPRITES[0]?.path ?? "");
+
   const assignedCount = seats.filter((seat) => seat.assigned).length;
-  const busy = selectedSeat.status === "running";
-  const canSave = Boolean(name.trim() && roleTitle.trim() && spriteKey && spritePath && !busy);
+  const busy = selectedSeat.status === "running" || selectedSeat.status === "returning";
+  const canSave = Boolean(
+    effectiveName.trim() &&
+    effectiveRoleTitle.trim() &&
+    effectiveSpriteKey &&
+    effectiveSpritePath &&
+    !busy
+  );
+
+  const beginDraftForSeat = (seat: SeatState) => {
+    setDraftSeatId(seat.seatId);
+    setName(seat.assigned ? seat.label : "");
+    setRoleTitle(seat.roleTitle ?? "");
+    setSpriteKey(seat.spriteKey ?? WORKER_SPRITES[0]?.key ?? "");
+    setSpritePath(seat.spritePath ?? WORKER_SPRITES[0]?.path ?? "");
+  };
 
   const handleSave = () => {
     if (!canSave) return;
     updateSeatConfig(selectedSeat.seatId, {
       assigned: true,
-      label: name.trim(),
-      roleTitle: roleTitle.trim(),
-      spriteKey,
-      spritePath,
+      label: effectiveName.trim(),
+      roleTitle: effectiveRoleTitle.trim(),
+      spriteKey: effectiveSpriteKey,
+      spritePath: effectiveSpritePath,
     });
   };
 
@@ -179,7 +185,10 @@ export default function SeatManagerModal({
               <button
                 key={seat.seatId}
                 type="button"
-                onClick={() => setSelectedSeatId(seat.seatId)}
+                onClick={() => {
+                  setSelectedSeatId(seat.seatId);
+                  beginDraftForSeat(seat);
+                }}
                 style={{
                   border: active ? "2px solid var(--pixel-accent)" : "2px solid rgba(255,255,255,0.08)",
                   background: active ? "rgba(233, 69, 96, 0.14)" : "rgba(8, 14, 24, 0.45)",
@@ -252,8 +261,8 @@ export default function SeatManagerModal({
                 overflow: "hidden",
               }}
             >
-              {spritePath ? (
-                <CharacterPortrait spritePath={spritePath} name={name || "Crew preview"} large />
+              {effectiveSpritePath ? (
+                <CharacterPortrait spritePath={effectiveSpritePath} name={effectiveName || "Crew preview"} large />
               ) : (
                 <div style={{ fontSize: 8, color: "var(--pixel-muted)" }}>No character assigned</div>
               )}
@@ -262,7 +271,7 @@ export default function SeatManagerModal({
             <div className="hud-panel__stack" style={{ gap: 10 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                 <div>
-                  <div style={{ fontSize: 12 }}>{selectedSeat.assigned ? name || selectedSeat.label : "Vacant Seat"}</div>
+                  <div style={{ fontSize: 12 }}>{selectedSeat.assigned ? effectiveName || selectedSeat.label : "Vacant Seat"}</div>
                   <div style={{ fontSize: 8, color: "var(--pixel-muted)", marginTop: 4 }}>
                     {selectedSeat.seatId} · facing {selectedSeat.spawnFacing ?? "down"}
                   </div>
@@ -283,8 +292,11 @@ export default function SeatManagerModal({
                 <label className="hud-panel__label">Name</label>
                 <input
                   className="pixel-input hud-panel__input"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
+                  value={effectiveName}
+                  onChange={(event) => {
+                    if (!usingDraft) beginDraftForSeat(selectedSeat);
+                    setName(event.target.value);
+                  }}
                   disabled={busy}
                   placeholder="Crew name"
                   style={{ minHeight: 0 }}
@@ -295,8 +307,11 @@ export default function SeatManagerModal({
                 <label className="hud-panel__label">Role / Title</label>
                 <input
                   className="pixel-input hud-panel__input"
-                  value={roleTitle}
-                  onChange={(event) => setRoleTitle(event.target.value)}
+                  value={effectiveRoleTitle}
+                  onChange={(event) => {
+                    if (!usingDraft) beginDraftForSeat(selectedSeat);
+                    setRoleTitle(event.target.value);
+                  }}
                   disabled={busy}
                   placeholder="Role title"
                   style={{ minHeight: 0 }}
@@ -309,7 +324,10 @@ export default function SeatManagerModal({
                       className="pixel-button"
                       style={{ fontSize: 7, padding: "4px 6px" }}
                       disabled={busy}
-                      onClick={() => setRoleTitle(preset)}
+                      onClick={() => {
+                        if (!usingDraft) beginDraftForSeat(selectedSeat);
+                        setRoleTitle(preset);
+                      }}
                     >
                       {preset}
                     </button>
@@ -329,7 +347,7 @@ export default function SeatManagerModal({
             }}
           >
             {busy
-              ? "This seat is currently running a task. Finish or stop the task before changing crew assignment."
+              ? "This seat is currently active. Finish or stop the task before changing crew assignment."
               : "Select a portrait, set name and role, then save. Empty seats can be assigned immediately."}
           </div>
 
@@ -344,15 +362,16 @@ export default function SeatManagerModal({
             }}
           >
             {WORKER_SPRITES.map((sprite) => {
-              const active = sprite.key === spriteKey;
+              const active = sprite.key === effectiveSpriteKey;
               return (
                 <button
                   key={sprite.key}
                   type="button"
                   onClick={() => {
+                    if (!usingDraft) beginDraftForSeat(selectedSeat);
                     setSpriteKey(sprite.key);
                     setSpritePath(sprite.path);
-                    if (!name.trim()) setName(sprite.label);
+                    if (!effectiveName.trim()) setName(sprite.label);
                   }}
                   disabled={busy}
                   style={{

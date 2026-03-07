@@ -356,6 +356,36 @@ export class Worker {
     });
   }
 
+  abortTask(runId: string) {
+    const queuedIndex = this.taskQueue.findIndex((task) => task.runId === runId);
+    if (queuedIndex >= 0) {
+      this.taskQueue.splice(queuedIndex, 1);
+      this.showBubble("Queued task removed.", 2500);
+      return true;
+    }
+
+    if (this.assignedRunId !== runId) {
+      return false;
+    }
+
+    if (this.taskVisualTimer) {
+      this.taskVisualTimer.destroy();
+      this.taskVisualTimer = null;
+    }
+
+    this.stopIdleActivity();
+    this.assignedRunId = null;
+    this.setStatus("done");
+    this.showBubble("Task stopped.", TASK_BUBBLE_MS);
+    this.taskVisualTimer = this.scene.time.delayedCall(TASK_RESULT_HOLD_MS, () => {
+      this.taskVisualTimer = null;
+      if (this._status !== "done") return;
+      this.setStatus("idle");
+      this.processQueue();
+    });
+    return true;
+  }
+
   enqueueTask(runId: string, message: string, onReady?: () => void) {
     this.taskQueue.push({ runId, message, onReady });
     const queueSize = this.taskQueue.length;

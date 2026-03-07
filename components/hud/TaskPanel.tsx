@@ -12,6 +12,8 @@ function taskStatusLabel(status: TaskItem["status"]) {
       return "returning";
     case "submitted":
       return "sending";
+    case "stopped":
+      return "stopped";
     default:
       return status;
   }
