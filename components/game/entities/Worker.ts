@@ -45,6 +45,12 @@ export type WorkerStatus = "idle" | "working" | "done" | "failed";
 
 export type POI = POIDef;
 
+type QueuedTask = {
+  runId: string;
+  message: string;
+  onReady?: () => void;
+};
+
 const WORKER_SPEED = MOVE_SPEED * WORKER_SPEED_FACTOR;
 const BODY_WIDTH = FRAME_WIDTH * BODY_SIZE_RATIO_W;
 const BODY_HEIGHT = FRAME_HEIGHT * BODY_SIZE_RATIO_H;
@@ -105,10 +111,11 @@ export class Worker {
   private pathfinder: Pathfinder | null = null;
 
   /** Task queue */
-  taskQueue: Array<{ runId: string; message: string }> = [];
+  taskQueue: QueuedTask[] = [];
 
   /** The runId currently assigned to this worker (null = idle) */
   assignedRunId: string | null = null;
+  private interactionLocked = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -274,7 +281,6 @@ export class Worker {
       this.scheduleWander();
     } else if (status === "working") {
       this.stopIdleActivity();
-      this.showEmote("emote:thinking");
       this.canWander = false;
     } else if (status === "done") {
       this.canWander = false;
@@ -285,20 +291,37 @@ export class Worker {
 
   // ── Task management ───────────────────────────────────
 
-  assignTask(runId: string, taskMessage: string) {
+  assignTask(runId: string, taskMessage: string, onReady?: () => void) {
     this.stopIdleActivity();
     this.assignedRunId = runId;
     this.setStatus("working");
-    this.showBubble(`📋 ${taskMessage}`, TASK_BUBBLE_MS);
-    if (this.taskVisualTimer) {
-      this.taskVisualTimer.destroy();
-      this.taskVisualTimer = null;
+
+    const beginProcessing = () => {
+      this.showBubble(`📋 ${taskMessage}`, TASK_BUBBLE_MS);
+      onReady?.();
+      if (this.taskVisualTimer) {
+        this.taskVisualTimer.destroy();
+        this.taskVisualTimer = null;
+      }
+      this.taskVisualTimer = this.scene.time.delayedCall(TASK_THINK_DELAY_MS, () => {
+        if (this._status === "working") this.showEmote("emote:thinking");
+        this.taskVisualTimer = null;
+      });
+    };
+
+    const shouldReturnHomeFirst = this.moveTarget !== null || !this.isAtHomePose() || this.isWandering;
+    if (shouldReturnHomeFirst) {
+      this.interactionLocked = true;
+      this.showBubble("Returning to desk...", TASK_BUBBLE_MS);
+      this.onArrival = () => {
+        this.interactionLocked = false;
+        beginProcessing();
+      };
+      this.navigateHome();
+      return;
     }
-    this.taskVisualTimer = this.scene.time.delayedCall(TASK_THINK_DELAY_MS, () => {
-      if (this._status === "working") this.showEmote("emote:thinking");
-      this.taskVisualTimer = null;
-    });
-    this.navigateHome();
+
+    beginProcessing();
   }
 
   completeTask() {
@@ -333,8 +356,8 @@ export class Worker {
     });
   }
 
-  enqueueTask(runId: string, message: string) {
-    this.taskQueue.push({ runId, message });
+  enqueueTask(runId: string, message: string, onReady?: () => void) {
+    this.taskQueue.push({ runId, message, onReady });
     const queueSize = this.taskQueue.length;
     const preview = message.length > 18 ? `${message.slice(0, 18)}...` : message;
     this.showBubble(`Queued #${queueSize}: ${preview}`, 3000);
@@ -343,7 +366,7 @@ export class Worker {
   private processQueue() {
     if (this.taskQueue.length === 0) return;
     const next = this.taskQueue.shift()!;
-    this.assignTask(next.runId, next.message);
+    this.assignTask(next.runId, next.message, next.onReady);
   }
 
   private stopIdleActivity() {
@@ -357,6 +380,7 @@ export class Worker {
     }
     this.onArrival = null;
     this.isWandering = false;
+    this.interactionLocked = false;
     this.hideEmote();
     this.bubble.hide();
   }
@@ -369,6 +393,20 @@ export class Worker {
     this.pathfinder = pf;
   }
 
+  canInteract() {
+    return !this.interactionLocked;
+  }
+
+  isAwayFromDesk() {
+    return this.moveTarget !== null || this.isWandering || !this.isAtHomePose();
+  }
+
+  rebindAssignedRun(previousRunId: string, nextRunId: string) {
+    if (this.assignedRunId === previousRunId) {
+      this.assignedRunId = nextRunId;
+    }
+  }
+
   private navPoint() {
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
     return { x: body.center.x, y: body.center.y };
@@ -379,6 +417,10 @@ export class Worker {
       x: this.homeX + HOME_NAV_OFFSET_X,
       y: this.homeY + HOME_NAV_OFFSET_Y,
     };
+  }
+
+  private isAtHomePose() {
+    return Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, this.homeX, this.homeY) <= 2;
   }
 
   private poiFacing(poiName: string): Direction {

@@ -280,6 +280,7 @@ export class OfficeScene extends Phaser.Scene {
     let minDist = Infinity;
 
     for (const worker of this.workers) {
+      if (!worker.canInteract()) continue;
       const dist = Phaser.Math.Distance.Between(
         this.player.sprite.x, this.player.sprite.y,
         worker.sprite.x, worker.sprite.y,
@@ -353,12 +354,31 @@ export class OfficeScene extends Phaser.Scene {
 
     this.gameEventUnsubs.push(gameEvents.on("task-assigned", (runId, message, seatId) => {
       const worker = this.findWorkerBySeatId(seatId) ?? this.findIdleWorker();
-      if (!worker) return;
-      if (seatId && worker.status === "working" && worker.assignedRunId) {
-        worker.enqueueTask(runId, message);
+      if (!worker) {
+        gameEvents.emit("task-ready", runId, message, seatId);
         return;
       }
-      worker.assignTask(runId, message);
+      if (seatId && worker.status === "working" && worker.assignedRunId) {
+        gameEvents.emit("task-staged", runId, "queued", worker.seatId);
+        worker.enqueueTask(runId, message, () => gameEvents.emit("task-ready", runId, message, worker.seatId));
+        this.runWorkerMap.set(runId, worker);
+        return;
+      }
+
+      if (worker.isAwayFromDesk()) {
+        gameEvents.emit("task-staged", runId, "returning", worker.seatId);
+      }
+
+      const ready = () => gameEvents.emit("task-ready", runId, message, worker.seatId);
+      worker.assignTask(runId, message, ready);
+      this.runWorkerMap.set(runId, worker);
+    }));
+
+    this.gameEventUnsubs.push(gameEvents.on("task-bound", (taskId, runId) => {
+      const worker = this.runWorkerMap.get(taskId);
+      if (!worker) return;
+      worker.rebindAssignedRun(taskId, runId);
+      this.runWorkerMap.delete(taskId);
       this.runWorkerMap.set(runId, worker);
     }));
 

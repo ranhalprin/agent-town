@@ -628,6 +628,14 @@ canvas {
   color: var(--pixel-yellow);
 }
 
+.hud-status--queued {
+  color: #f59e0b;
+}
+
+.hud-status--returning {
+  color: #60a5fa;
+}
+
 .hud-status--completed,
 .hud-status--done {
   color: var(--pixel-green);

@@ -21,7 +21,7 @@ export default function ChatPanel({
   sessions: SessionRecord[];
   activeSessionKey?: string;
 }) {
-  const { dispatchTask } = useStudio();
+  const { assignTask } = useStudio();
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -45,7 +45,7 @@ export default function ChatPanel({
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed || !isConnected) return;
-    dispatchTask(trimmed);
+    assignTask(trimmed);
     setInput("");
     requestAnimationFrame(() => inputRef.current?.focus());
   };

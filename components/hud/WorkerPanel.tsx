@@ -3,6 +3,12 @@
 import type { SeatState } from "@/types/game";
 import HudFlyout from "./HudFlyout";
 
+function seatStatusLabel(seat: SeatState) {
+  if (!seat.assigned) return "vacant";
+  if (seat.status === "empty") return "idle";
+  return seat.status;
+}
+
 export default function WorkerPanel({
   seats,
   onOpenManager,
@@ -10,7 +16,7 @@ export default function WorkerPanel({
   seats: SeatState[];
   onOpenManager: () => void;
 }) {
-  const active = seats.filter((seat) => seat.status === "running").length;
+  const active = seats.filter((seat) => seat.status === "running" || seat.status === "returning").length;
 
   return (
     <HudFlyout
@@ -31,7 +37,7 @@ export default function WorkerPanel({
         {seats.map((seat) => (
           <div key={seat.seatId} className="hud-workers__item">
             <div className="hud-workers__top">
-              <span className={`hud-status hud-status--${seat.status}`}>{seat.assigned ? seat.status : "vacant"}</span>
+              <span className={`hud-status hud-status--${seat.status}`}>{seatStatusLabel(seat)}</span>
               <span>{seat.assigned ? seat.label : "Vacant Seat"}</span>
             </div>
             <div className="hud-workers__task">

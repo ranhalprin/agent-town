@@ -8,7 +8,7 @@ export default function TerminalModal() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [targetSeatId, setTargetSeatId] = useState<string | undefined>(undefined);
-  const { state, dispatchTask } = useStudio();
+  const { state, assignTask } = useStudio();
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const isConnected = state.connection === "connected";
@@ -50,14 +50,14 @@ export default function TerminalModal() {
         close();
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    document.addEventListener("keydown", handler, true);
+    return () => document.removeEventListener("keydown", handler, true);
   }, [open, close]);
 
   const handleSubmit = () => {
     const trimmed = input.trim();
     if (!trimmed || !isConnected) return;
-    dispatchTask(trimmed, targetSeatId);
+    assignTask(trimmed, targetSeatId);
     setInput("");
     close();
   };
@@ -65,6 +65,11 @@ export default function TerminalModal() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Stop game from receiving keys while terminal is open
     e.stopPropagation();
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -135,7 +140,7 @@ export default function TerminalModal() {
             onClick={handleSubmit}
             disabled={!isConnected || !input.trim()}
           >
-            Dispatch
+            Assign
           </button>
         </div>
 

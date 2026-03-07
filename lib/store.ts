@@ -188,7 +188,13 @@ type Action =
   | { type: "SET_ACTIVE_SESSION"; sessionKey?: string }
   | { type: "SET_SESSION_METRICS"; metrics: SessionMetrics }
   | { type: "ASSIGN_SEAT"; runId: string; taskSnippet: string; seatId?: string }
+  | { type: "BIND_SEAT_RUN"; taskId: string; runId: string }
   | { type: "SET_SEAT_STATUS"; runId: string; status: SeatState["status"] }
+  | {
+      type: "PATCH_SEAT_RUNTIME";
+      seatId: string;
+      patch: Partial<Pick<SeatState, "status" | "taskSnippet" | "runId" | "startedAt">>;
+    }
   | { type: "SYNC_SEATS"; seats: SeatState[] }
   | { type: "UPDATE_SEAT_CONFIG"; seatId: string; patch: Partial<SeatState> }
   | { type: "RESET_SEATS" }
@@ -317,6 +323,14 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
       return { ...state, seats };
     }
 
+    case "BIND_SEAT_RUN":
+      return {
+        ...state,
+        seats: state.seats.map((seat) =>
+          seat.runId === action.taskId ? { ...seat, runId: action.runId } : seat
+        ),
+      };
+
     case "SET_SEAT_STATUS": {
       const seats: SeatState[] = state.seats.map((seat) => {
         if (seat.runId !== action.runId) return seat;
@@ -338,6 +352,14 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
       });
       return { ...state, seats };
     }
+
+    case "PATCH_SEAT_RUNTIME":
+      return {
+        ...state,
+        seats: state.seats.map((seat) =>
+          seat.seatId === action.seatId ? { ...seat, ...action.patch } : seat
+        ),
+      };
 
     case "SYNC_SEATS":
       return { ...state, seats: action.seats };
@@ -421,7 +443,7 @@ interface StudioContextValue {
   state: StudioSnapshot;
   connect: (config?: GatewayConfig) => void;
   disconnect: () => void;
-  dispatchTask: (message: string, seatId?: string) => void;
+  assignTask: (message: string, seatId?: string) => void;
   updateSeatConfig: (seatId: string, patch: Partial<SeatState>) => void;
   newSession: () => void;
   switchSession: (sessionKey: string) => void;
@@ -933,17 +955,122 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     dispatchRef.current({ type: "UPDATE_SEAT_CONFIG", seatId, patch });
   }, []);
 
-  const dispatchTask = useCallback((message: string, seatId?: string) => {
+  const sendTaskToGateway = useCallback((taskId: string, message: string, seatId?: string) => {
+    const client = clientRef.current;
+    if (!client || client.status !== "connected") return;
+    const actorName = resolveSeatLabelForTask(seatsRef.current, seatId);
+
+    dispatchRef.current({
+      type: "UPDATE_TASK",
+      taskId,
+      patch: { status: "submitted" },
+    });
+    if (seatId) {
+      dispatchRef.current({
+        type: "PATCH_SEAT_RUNTIME",
+        seatId,
+        patch: {
+          status: "running",
+          taskSnippet: message.slice(0, 28),
+          startedAt: new Date().toISOString(),
+        },
+      });
+    }
+
+    const sessionKey = activeSessionKeyRef.current;
+    client
+      .request("agent", {
+        message,
+        agentId: "main",
+        idempotencyKey: taskId,
+        ...(sessionKey ? { sessionKey } : {}),
+      })
+      .then((res: GatewayFrame) => {
+        const runId = res.payload?.runId as string | undefined;
+        const finalRunId = runId ?? taskId;
+        if (actorName) {
+          runActorRef.current.set(finalRunId, actorName);
+          dispatchRef.current({ type: "SET_RUN_ACTOR", runId: finalRunId, actorName });
+        }
+        dispatchRef.current({
+          type: "UPDATE_TASK",
+          taskId,
+          patch: { status: "running", runId: runId ?? undefined },
+        });
+        dispatchRef.current({
+          type: "BIND_SEAT_RUN",
+          taskId,
+          runId: finalRunId,
+        });
+        gameEvents.emit("task-bound", taskId, finalRunId);
+        scheduleSessionMetricsRefresh(300);
+      })
+      .catch((err: Error) => {
+        console.error("[Gateway] assign failed:", err);
+        dispatchRef.current({
+          type: "UPDATE_TASK",
+          taskId,
+          patch: { status: "failed" },
+        });
+        dispatchRef.current({
+          type: "SET_SEAT_STATUS",
+          runId: taskId,
+          status: "failed",
+        });
+        gameEvents.emit("task-failed", taskId);
+        dispatchRef.current({
+          type: "APPEND_CHAT",
+          message: {
+            id: chatId(), runId: taskId, role: "system",
+            content: `Assign failed: ${err.message}`,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      });
+  }, [scheduleSessionMetricsRefresh]);
+
+  useEffect(() => {
+    return gameEvents.on("task-ready", (taskId, message, seatId) => {
+      sendTaskToGateway(taskId, message, seatId);
+    });
+  }, [sendTaskToGateway]);
+
+  useEffect(() => {
+    return gameEvents.on("task-staged", (taskId, stage, seatId) => {
+      dispatchRef.current({
+        type: "UPDATE_TASK",
+        taskId,
+        patch: { status: stage },
+      });
+
+      if (!seatId) return;
+
+      if (stage === "returning") {
+        dispatchRef.current({
+          type: "PATCH_SEAT_RUNTIME",
+          seatId,
+          patch: {
+            status: "returning",
+            runId: taskId,
+            taskSnippet: "Returning to desk...",
+            startedAt: new Date().toISOString(),
+          },
+        });
+      }
+    });
+  }, []);
+
+  const assignTask = useCallback((message: string, seatId?: string) => {
     const client = clientRef.current;
     if (!client || client.status !== "connected") return;
 
-    const idempotencyKey = `aw_task_${++taskCounterRef.current}_${Date.now()}`;
+    const taskId = `aw_task_${++taskCounterRef.current}_${Date.now()}`;
     const actorName = resolveSeatLabelForTask(seatsRef.current, seatId);
 
     dispatchRef.current({
       type: "ADD_TASK",
       task: {
-        taskId: idempotencyKey,
+        taskId,
         message,
         status: "submitted",
         actorName,
@@ -954,63 +1081,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     dispatchRef.current({
       type: "APPEND_CHAT",
       message: {
-        id: chatId(), runId: idempotencyKey, role: "user",
+        id: chatId(), runId: taskId, role: "user",
         content: message,
         timestamp: new Date().toISOString(),
       },
     });
 
-    const sessionKey = activeSessionKeyRef.current;
-    client
-      .request("agent", {
-        message,
-        agentId: "main",
-        idempotencyKey,
-        ...(sessionKey ? { sessionKey } : {}),
-      })
-      .then((res: GatewayFrame) => {
-        const runId = res.payload?.runId as string | undefined;
-        const finalRunId = runId ?? idempotencyKey;
-        if (actorName) {
-          runActorRef.current.set(finalRunId, actorName);
-          dispatchRef.current({ type: "SET_RUN_ACTOR", runId: finalRunId, actorName });
-        }
-        dispatchRef.current({
-          type: "UPDATE_TASK",
-          taskId: idempotencyKey,
-          patch: { status: "running", runId: runId ?? undefined },
-        });
-        dispatchRef.current({
-          type: "ASSIGN_SEAT",
-          runId: finalRunId,
-          taskSnippet: message.slice(0, 28),
-          seatId,
-        });
-        gameEvents.emit("task-assigned", finalRunId, message, seatId);
-        scheduleSessionMetricsRefresh(300);
-      })
-      .catch((err: Error) => {
-        console.error("[Gateway] dispatch failed:", err);
-        dispatchRef.current({
-          type: "UPDATE_TASK",
-          taskId: idempotencyKey,
-          patch: { status: "failed" },
-        });
-        dispatchRef.current({
-          type: "SET_SEAT_STATUS",
-          runId: idempotencyKey,
-          status: "failed",
-        });
-        dispatchRef.current({
-          type: "APPEND_CHAT",
-          message: {
-            id: chatId(), runId: idempotencyKey, role: "system",
-            content: `Dispatch failed: ${err.message}`,
-            timestamp: new Date().toISOString(),
-          },
-        });
-      });
-  }, [scheduleSessionMetricsRefresh]);
+    dispatchRef.current({
+      type: "ASSIGN_SEAT",
+      runId: taskId,
+      taskSnippet: message.slice(0, 28),
+      seatId,
+    });
+
+    gameEvents.emit("task-assigned", taskId, message, seatId);
+  }, []);
 
   const loadSessionPreview = useCallback(async (sessionKey: string): Promise<ChatMessage[]> => {
     const client = clientRef.current;
@@ -1111,7 +1196,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   return React.createElement(
     StudioContext.Provider,
-    { value: { state, connect, disconnect, dispatchTask, updateSeatConfig, newSession, switchSession } },
+    { value: { state, connect, disconnect, assignTask, updateSeatConfig, newSession, switchSession } },
     children,
   );
 }

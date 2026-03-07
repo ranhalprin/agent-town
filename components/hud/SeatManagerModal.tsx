@@ -25,6 +25,7 @@ function seatStateLabel(seat: SeatState) {
 
 function seatSummary(seat: SeatState) {
   if (!seat.assigned) return "No crew assigned";
+  if (seat.status === "returning") return seat.taskSnippet ?? "Returning to desk";
   if (seat.status === "running") return seat.taskSnippet ?? "Handling task";
   if (seat.status === "done") return "Recently completed task";
   if (seat.status === "failed") return "Last task failed";

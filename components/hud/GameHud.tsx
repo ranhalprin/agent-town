@@ -32,9 +32,15 @@ export default function GameHud() {
   );
 
   const runningCount = state.tasks.filter(
-    (task) => task.status === "running" || task.status === "submitted"
+    (task) =>
+      task.status === "running" ||
+      task.status === "submitted" ||
+      task.status === "queued" ||
+      task.status === "returning"
   ).length;
-  const activeWorkers = state.seats.filter((seat) => seat.status === "running").length;
+  const activeWorkers = state.seats.filter(
+    (seat) => seat.status === "running" || seat.status === "returning"
+  ).length;
 
   const togglePanel = useCallback((id: HudPanelId) => {
     setOpenPanel((current) => (current === id ? null : id));

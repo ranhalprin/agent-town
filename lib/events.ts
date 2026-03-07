@@ -5,6 +5,9 @@ export interface GameEventMap {
   "seats-discovered": [seats: SeatDef[]];
   "seat-configs-updated": [seats: SeatState[]];
   "task-assigned": [runId: string, message: string, seatId?: string];
+  "task-ready": [taskId: string, message: string, seatId?: string];
+  "task-bound": [taskId: string, runId: string];
+  "task-staged": [taskId: string, stage: "queued" | "returning", seatId?: string];
   "task-bubble": [runId: string, text: string, ttl: number];
   "task-completed": [runId: string];
   "task-failed": [runId: string];

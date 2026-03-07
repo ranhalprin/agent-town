@@ -8,7 +8,7 @@ export type ConnectionStatus =
 
 export type SeatFacing = "right" | "up" | "left" | "down";
 
-export type SeatStatus = "empty" | "running" | "done" | "failed";
+export type SeatStatus = "empty" | "returning" | "running" | "done" | "failed";
 
 export interface SeatState {
   seatId: string;
@@ -28,6 +28,8 @@ export interface SeatState {
 
 export type TaskStatus =
   | "submitted"
+  | "queued"
+  | "returning"
   | "running"
   | "completed"
   | "failed";
