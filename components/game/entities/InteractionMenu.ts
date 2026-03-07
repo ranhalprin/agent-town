@@ -49,7 +49,8 @@ export class InteractionMenu {
     this.container.setVisible(false);
     this.container.setScrollFactor(0);
 
-    const kb = scene.input.keyboard!;
+    const kb = scene.input.keyboard;
+    if (!kb) throw new Error("Keyboard plugin not available");
     this.upKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.W);
     this.downKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.S);
     this.upArrow = kb.addKey(Phaser.Input.Keyboard.KeyCodes.UP);

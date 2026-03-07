@@ -10,13 +10,24 @@ const DEFAULT_TTL = 5000;
 const BUBBLE_FONT_SIZE = 8;
 const BUBBLE_FONT_FAMILY = '"Zpix20260307", "Zpix", monospace';
 
+// Shared canvas context for text measurement across all ChatBubble instances
+let sharedMeasureCtx: CanvasRenderingContext2D | null = null;
+function getMeasureCtx(): CanvasRenderingContext2D | null {
+  if (!sharedMeasureCtx) {
+    sharedMeasureCtx = document.createElement("canvas").getContext("2d");
+    if (sharedMeasureCtx) {
+      sharedMeasureCtx.font = `${BUBBLE_FONT_SIZE}px ${BUBBLE_FONT_FAMILY}`;
+    }
+  }
+  return sharedMeasureCtx;
+}
+
 export class ChatBubble {
   private container: Phaser.GameObjects.Container;
   private bg: Phaser.GameObjects.Graphics;
   private text: Phaser.GameObjects.Text;
   private scene: Phaser.Scene;
   private fadeTimer: Phaser.Time.TimerEvent | null = null;
-  private measureCtx: CanvasRenderingContext2D | null = null;
 
   constructor(scene: Phaser.Scene, depth = 25) {
     this.scene = scene;
@@ -28,10 +39,6 @@ export class ChatBubble {
       lineSpacing: 6,
     });
     this.text.setOrigin(0, 0);
-    this.measureCtx = document.createElement("canvas").getContext("2d");
-    if (this.measureCtx) {
-      this.measureCtx.font = `${BUBBLE_FONT_SIZE}px ${BUBBLE_FONT_FAMILY}`;
-    }
 
     this.container = scene.add.container(0, 0, [this.bg, this.text]);
     this.container.setDepth(depth);
@@ -40,7 +47,8 @@ export class ChatBubble {
 
   private wrapText(input: string) {
     const maxWidth = BUBBLE_MAX_WIDTH - BUBBLE_PAD_X * 2;
-    if (!this.measureCtx) return input;
+    const ctx = getMeasureCtx();
+    if (!ctx) return input;
 
     const wrappedLines: string[] = [];
     for (const paragraph of input.split("\n")) {
@@ -52,7 +60,7 @@ export class ChatBubble {
       let line = "";
       for (const char of paragraph) {
         const candidate = line + char;
-        if (line && this.measureCtx.measureText(candidate).width > maxWidth) {
+        if (line && ctx.measureText(candidate).width > maxWidth) {
           wrappedLines.push(line);
           line = char;
         } else {
@@ -145,7 +153,6 @@ export class ChatBubble {
   destroy() {
     if (this.fadeTimer) this.fadeTimer.destroy();
     this.scene.tweens.killTweensOf(this.container);
-    this.measureCtx = null;
     this.container.destroy();
   }
 }

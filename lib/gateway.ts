@@ -4,22 +4,17 @@
  * Protocol: frame-based RPC over WebSocket.
  *   - req/res for request-response
  *   - event for server-pushed updates
- *   - Handshake: connect.challenge → connect → hello-ok
+ *   - Handshake: connect.challenge -> connect -> hello-ok
+ *
+ * Features:
+ *   - Automatic reconnection with exponential backoff
+ *   - Typed event dispatching
+ *   - Request timeout management
  */
 
-type Listener = (payload: unknown) => void;
+import type { GatewayFrame } from "./gateway-types";
 
-export interface GatewayFrame {
-  type: "req" | "res" | "event";
-  id?: string;
-  method?: string;
-  params?: Record<string, unknown>;
-  ok?: boolean;
-  payload?: Record<string, unknown>;
-  error?: { code: string; message: string; retryable?: boolean };
-  event?: string;
-  seq?: number;
-}
+type Listener = (payload: unknown) => void;
 
 interface PendingRequest {
   resolve: (res: GatewayFrame) => void;
@@ -28,6 +23,14 @@ interface PendingRequest {
 }
 
 export type GatewayStatus = "disconnected" | "connecting" | "connected" | "error";
+
+// ── Reconnect config ───────────────────────────────────
+
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 30000;
+const RECONNECT_FACTOR = 2;
+const HANDSHAKE_TIMEOUT_MS = 15000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30000;
 
 let counter = 0;
 function nextId(): string {
@@ -45,6 +48,12 @@ export class GatewayClient {
 
   private connectReject: ((err: Error) => void) | null = null;
   private connectSettled = false;
+
+  /** Reconnection state */
+  private autoReconnect = false;
+  private reconnectAttempt = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private intentionalClose = false;
 
   constructor(url: string, token: string) {
     this.url = url;
@@ -74,6 +83,13 @@ export class GatewayClient {
   }
 
   connect(): Promise<GatewayFrame> {
+    this.autoReconnect = true;
+    this.reconnectAttempt = 0;
+    this.intentionalClose = false;
+    return this.connectOnce();
+  }
+
+  private connectOnce(): Promise<GatewayFrame> {
     return new Promise((resolve, reject) => {
       if (this.ws) {
         this.ws.close();
@@ -102,6 +118,7 @@ export class GatewayClient {
           if (!this.connectSettled) {
             this.connectSettled = true;
             this.connectReject = null;
+            this.reconnectAttempt = 0;
             resolve(res);
           }
         });
@@ -113,15 +130,40 @@ export class GatewayClient {
       };
 
       ws.onclose = () => {
+        const wasConnected = this._status === "connected";
         this.setStatus("disconnected");
         this.rejectConnect(new Error("Connection closed before handshake"));
-        for (const [id, p] of this.pending) {
-          p.reject(new Error("Connection closed"));
-          clearTimeout(p.timer);
-          this.pending.delete(id);
+        this.clearPending();
+
+        if (!this.intentionalClose && this.autoReconnect) {
+          this.scheduleReconnect(wasConnected);
         }
       };
     });
+  }
+
+  private scheduleReconnect(wasConnected: boolean) {
+    if (this.reconnectTimer) return;
+
+    // If we were previously connected, reset attempt counter for faster retry
+    if (wasConnected) {
+      this.reconnectAttempt = 0;
+    }
+
+    const delay = Math.min(
+      RECONNECT_BASE_MS * Math.pow(RECONNECT_FACTOR, this.reconnectAttempt),
+      RECONNECT_MAX_MS,
+    );
+    this.reconnectAttempt++;
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (!this.autoReconnect || this.intentionalClose) return;
+
+      this.connectOnce().catch(() => {
+        // Error handled by onclose -> scheduleReconnect
+      });
+    }, delay);
   }
 
   private rejectConnect(err: Error) {
@@ -132,20 +174,28 @@ export class GatewayClient {
     }
   }
 
+  private clearPending() {
+    for (const [id, p] of this.pending) {
+      p.reject(new Error("Connection closed"));
+      clearTimeout(p.timer);
+      this.pending.delete(id);
+    }
+  }
+
   private handleFrame(frame: GatewayFrame, onConnected?: (res: GatewayFrame) => void) {
     if (frame.type === "event") {
-      // Handle connect.challenge → send connect request
       if (frame.event === "connect.challenge") {
         this.sendConnectHandshake();
         return;
       }
 
-      // Dispatch to event listeners
-      const listeners = this.eventListeners.get(frame.event!);
-      if (listeners) {
-        listeners.forEach((fn) => fn(frame.payload));
+      if (frame.event) {
+        const listeners = this.eventListeners.get(frame.event);
+        if (listeners) {
+          listeners.forEach((fn) => fn(frame.payload));
+        }
       }
-      // Also fire wildcard
+      // Fire wildcard listeners
       const wildcard = this.eventListeners.get("*");
       if (wildcard) {
         wildcard.forEach((fn) => fn(frame));
@@ -153,16 +203,13 @@ export class GatewayClient {
       return;
     }
 
-    if (frame.type === "res") {
-      const pending = this.pending.get(frame.id!);
+    if (frame.type === "res" && frame.id) {
+      const pending = this.pending.get(frame.id);
       if (pending) {
         clearTimeout(pending.timer);
-        this.pending.delete(frame.id!);
+        this.pending.delete(frame.id);
 
-        if (
-          frame.ok &&
-          frame.payload?.type === "hello-ok"
-        ) {
+        if (frame.ok && frame.payload?.type === "hello-ok") {
           this.setStatus("connected");
           onConnected?.(frame);
         }
@@ -171,7 +218,7 @@ export class GatewayClient {
           pending.resolve(frame);
         } else {
           pending.reject(
-            new Error(frame.error?.message ?? "Request failed")
+            new Error(frame.error?.message ?? "Request failed"),
           );
         }
         return;
@@ -204,7 +251,7 @@ export class GatewayClient {
         maxProtocol: 3,
         client: {
           id: "gateway-client",
-          displayName: "Agent World",
+          displayName: "Agent Town",
           version: "1.0.0",
           platform: "web",
           mode: "backend",
@@ -221,7 +268,7 @@ export class GatewayClient {
       this.pending.delete(id);
       this.setStatus("error");
       this.rejectConnect(new Error("Handshake timeout (15s)"));
-    }, 15000);
+    }, HANDSHAKE_TIMEOUT_MS);
 
     this.pending.set(id, {
       resolve: () => {},
@@ -235,7 +282,7 @@ export class GatewayClient {
   async request(
     method: string,
     params?: Record<string, unknown>,
-    timeoutMs = 30000
+    timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
   ): Promise<GatewayFrame> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error("Not connected");
@@ -261,10 +308,19 @@ export class GatewayClient {
   }
 
   disconnect() {
+    this.intentionalClose = true;
+    this.autoReconnect = false;
+
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
+    this.clearPending();
     this.setStatus("disconnected");
   }
 }

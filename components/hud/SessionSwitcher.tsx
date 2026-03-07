@@ -30,19 +30,11 @@ export default function SessionSwitcher({
     sessions.find((s) => s.key === activeKey)?.label ?? activeKey?.split(":").pop() ?? "Default";
 
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-flex", gap: 4, alignItems: "center" }}>
+    <div ref={ref} className="session-switcher">
       <button
         type="button"
         className="pixel-button"
-        style={{
-          fontSize: 7,
-          padding: "3px 8px",
-          whiteSpace: "nowrap",
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          maxWidth: 140,
-        }}
+        style={{ fontSize: 7, padding: "3px 8px", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4, maxWidth: 140 }}
         onClick={() => setOpen((prev) => !prev)}
         title="Switch session"
       >
@@ -60,26 +52,9 @@ export default function SessionSwitcher({
       </button>
 
       {open && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "calc(100% + 4px)",
-            right: 0,
-            minWidth: 180,
-            maxWidth: 240,
-            maxHeight: 200,
-            overflowY: "auto",
-            background: "var(--pixel-bg)",
-            border: "2px solid var(--pixel-border)",
-            zIndex: 50,
-            fontFamily: "var(--pixel-font)",
-            fontSize: 8,
-          }}
-        >
+        <div className="session-dropdown">
           {sessions.length === 0 ? (
-            <div style={{ padding: "8px 10px", color: "var(--pixel-muted)" }}>
-              No sessions yet
-            </div>
+            <div className="session-dropdown__empty">No sessions yet</div>
           ) : (
             sessions.map((session) => {
               const isActive = session.key === activeKey;
@@ -87,25 +62,13 @@ export default function SessionSwitcher({
                 <button
                   key={session.key}
                   type="button"
+                  className={`session-dropdown__item ${isActive ? "session-dropdown__item--active" : ""}`}
                   onClick={() => { switchSession(session.key); setOpen(false); }}
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    padding: "6px 8px",
-                    border: "none",
-                    borderBottom: "1px solid var(--pixel-border)",
-                    background: isActive ? "rgba(74, 222, 128, 0.15)" : "transparent",
-                    color: isActive ? "#4ade80" : "var(--pixel-text)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontFamily: "inherit",
-                    fontSize: "inherit",
-                  }}
                 >
                   <div style={{ fontWeight: isActive ? "bold" : "normal" }}>
                     {session.label ?? session.key.split(":").pop()}
                   </div>
-                  <div style={{ fontSize: 7, color: "var(--pixel-muted)", marginTop: 2 }}>
+                  <div className="session-dropdown__time">
                     {formatRelativeTime(session.createdAt)}
                   </div>
                 </button>

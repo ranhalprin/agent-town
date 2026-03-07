@@ -24,12 +24,15 @@ export class Player {
     this.sprite.setDepth(5);
 
     // Physics body covers the feet area (bottom portion of the 48×96 frame)
-    this.sprite.body!.setSize(FRAME_WIDTH * 0.5, FRAME_HEIGHT * 0.2);
-    this.sprite.body!.setOffset(FRAME_WIDTH * 0.25, FRAME_HEIGHT * 0.75);
+    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+    body.setSize(FRAME_WIDTH * 0.5, FRAME_HEIGHT * 0.2);
+    body.setOffset(FRAME_WIDTH * 0.25, FRAME_HEIGHT * 0.75);
 
     // Keyboard input
-    this.cursors = scene.input.keyboard!.createCursorKeys();
-    this.wasd = scene.input.keyboard!.addKeys({
+    const kb = scene.input.keyboard;
+    if (!kb) throw new Error("Keyboard plugin not available");
+    this.cursors = kb.createCursorKeys();
+    this.wasd = kb.addKeys({
       W: Phaser.Input.Keyboard.KeyCodes.W,
       A: Phaser.Input.Keyboard.KeyCodes.A,
       S: Phaser.Input.Keyboard.KeyCodes.S,

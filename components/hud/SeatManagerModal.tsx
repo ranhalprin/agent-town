@@ -73,13 +73,7 @@ export default function SeatManagerModal({
 
   const assignedCount = seats.filter((seat) => seat.assigned).length;
   const busy = selectedSeat.status === "running" || selectedSeat.status === "returning";
-  const canSave = Boolean(
-    effectiveName.trim() &&
-    effectiveRoleTitle.trim() &&
-    effectiveSpriteKey &&
-    effectiveSpritePath &&
-    !busy
-  );
+  const canSave = Boolean(effectiveName.trim() && effectiveRoleTitle.trim() && effectiveSpriteKey && effectiveSpritePath && !busy);
 
   const beginDraftForSeat = (seat: SeatState) => {
     setDraftSeatId(seat.seatId);
@@ -112,45 +106,14 @@ export default function SeatManagerModal({
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 80,
-        background: "rgba(4, 10, 18, 0.72)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        pointerEvents: "auto",
-        padding: 24,
-      }}
+      className="seat-manager-overlay"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div
-        className="pixel-panel"
-        style={{
-          width: "min(1080px, 94vw)",
-          height: "min(680px, 88vh)",
-          display: "grid",
-          gridTemplateColumns: "320px 1fr",
-          gridTemplateRows: "auto 1fr",
-          gap: 12,
-          padding: 14,
-          pointerEvents: "auto",
-        }}
-      >
-        <div
-          style={{
-            gridColumn: "1 / -1",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            borderBottom: "2px solid rgba(255,255,255,0.08)",
-            paddingBottom: 10,
-          }}
-        >
+      <div className="seat-manager pixel-panel">
+        {/* Header */}
+        <div className="seat-manager__header">
           <div>
             <div style={{ fontSize: 14, color: "var(--pixel-text)" }}>Team Management</div>
             <div style={{ fontSize: 8, color: "var(--pixel-muted)", marginTop: 4 }}>
@@ -168,16 +131,8 @@ export default function SeatManagerModal({
           </button>
         </div>
 
-        <div
-          style={{
-            minHeight: 0,
-            overflowY: "auto",
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-            paddingRight: 4,
-          }}
-        >
+        {/* Seat list */}
+        <div style={{ minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, paddingRight: 4 }}>
           {seats.map((seat, index) => {
             const active = seat.seatId === selectedSeat.seatId;
             const statusLabel = seatStateLabel(seat);
@@ -185,34 +140,14 @@ export default function SeatManagerModal({
               <button
                 key={seat.seatId}
                 type="button"
+                className={`seat-card ${active ? "seat-card--active" : ""}`}
                 onClick={() => {
                   setSelectedSeatId(seat.seatId);
                   beginDraftForSeat(seat);
                 }}
-                style={{
-                  border: active ? "2px solid var(--pixel-accent)" : "2px solid rgba(255,255,255,0.08)",
-                  background: active ? "rgba(233, 69, 96, 0.14)" : "rgba(8, 14, 24, 0.45)",
-                  padding: 10,
-                  textAlign: "left",
-                  cursor: "pointer",
-                  fontFamily: "var(--pixel-font)",
-                  color: "var(--pixel-text)",
-                }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div
-                    style={{
-                      width: 52,
-                      height: 64,
-                      border: "2px solid rgba(255,255,255,0.08)",
-                      background: "#0d1b2a",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      overflow: "hidden",
-                      flexShrink: 0,
-                    }}
-                  >
+                <div className="seat-card__info">
+                  <div className={`seat-manager__portrait-frame seat-manager__portrait-frame--small`}>
                     {seat.assigned && seat.spritePath ? (
                       <CharacterPortrait spritePath={seat.spritePath} name={seat.label} />
                     ) : (
@@ -228,39 +163,22 @@ export default function SeatManagerModal({
                       {seat.assigned ? seat.roleTitle ?? "Agent" : "Unassigned"}
                     </div>
                   </div>
-                  <div
-                    style={{
-                      fontSize: 7,
-                      color: statusLabel === "vacant" ? "var(--pixel-muted)" : "var(--pixel-text)",
-                      background: statusLabel === "running" ? "rgba(250, 204, 21, 0.16)" : "rgba(255,255,255,0.06)",
-                      padding: "4px 6px",
-                      flexShrink: 0,
-                    }}
+                  <div className={`seat-card__status ${statusLabel === "running" ? "seat-card__status--running" : ""}`}
+                    style={{ color: statusLabel === "vacant" ? "var(--pixel-muted)" : "var(--pixel-text)" }}
                   >
                     {statusLabel}
                   </div>
                 </div>
-                <div style={{ fontSize: 8, color: "var(--pixel-muted)", marginTop: 8 }}>
-                  {seatSummary(seat)}
-                </div>
+                <div className="seat-card__summary">{seatSummary(seat)}</div>
               </button>
             );
           })}
         </div>
 
+        {/* Detail editor */}
         <div style={{ minWidth: 0, minHeight: 0, display: "grid", gridTemplateRows: "auto auto 1fr auto", gap: 12 }}>
           <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 12 }}>
-            <div
-              style={{
-                border: "2px solid rgba(255,255,255,0.08)",
-                background: "#0d1b2a",
-                minHeight: 260,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                overflow: "hidden",
-              }}
-            >
+            <div className="seat-manager__portrait-frame seat-manager__portrait-frame--large">
               {effectiveSpritePath ? (
                 <CharacterPortrait spritePath={effectiveSpritePath} name={effectiveName || "Crew preview"} large />
               ) : (
@@ -276,14 +194,7 @@ export default function SeatManagerModal({
                     {selectedSeat.seatId} · facing {selectedSeat.spawnFacing ?? "down"}
                   </div>
                 </div>
-                <div
-                  style={{
-                    fontSize: 7,
-                    padding: "4px 8px",
-                    background: "rgba(255,255,255,0.06)",
-                    color: selectedSeat.assigned ? "var(--pixel-text)" : "var(--pixel-muted)",
-                  }}
-                >
+                <div style={{ fontSize: 7, padding: "4px 8px", background: "rgba(255,255,255,0.06)", color: selectedSeat.assigned ? "var(--pixel-text)" : "var(--pixel-muted)" }}>
                   {seatStateLabel(selectedSeat)}
                 </div>
               </div>
@@ -293,10 +204,7 @@ export default function SeatManagerModal({
                 <input
                   className="pixel-input hud-panel__input"
                   value={effectiveName}
-                  onChange={(event) => {
-                    if (!usingDraft) beginDraftForSeat(selectedSeat);
-                    setName(event.target.value);
-                  }}
+                  onChange={(event) => { if (!usingDraft) beginDraftForSeat(selectedSeat); setName(event.target.value); }}
                   disabled={busy}
                   placeholder="Crew name"
                   style={{ minHeight: 0 }}
@@ -308,10 +216,7 @@ export default function SeatManagerModal({
                 <input
                   className="pixel-input hud-panel__input"
                   value={effectiveRoleTitle}
-                  onChange={(event) => {
-                    if (!usingDraft) beginDraftForSeat(selectedSeat);
-                    setRoleTitle(event.target.value);
-                  }}
+                  onChange={(event) => { if (!usingDraft) beginDraftForSeat(selectedSeat); setRoleTitle(event.target.value); }}
                   disabled={busy}
                   placeholder="Role title"
                   style={{ minHeight: 0 }}
@@ -324,10 +229,7 @@ export default function SeatManagerModal({
                       className="pixel-button"
                       style={{ fontSize: 7, padding: "4px 6px" }}
                       disabled={busy}
-                      onClick={() => {
-                        if (!usingDraft) beginDraftForSeat(selectedSeat);
-                        setRoleTitle(preset);
-                      }}
+                      onClick={() => { if (!usingDraft) beginDraftForSeat(selectedSeat); setRoleTitle(preset); }}
                     >
                       {preset}
                     </button>
@@ -337,36 +239,20 @@ export default function SeatManagerModal({
             </div>
           </div>
 
-          <div
-            style={{
-              border: "2px solid rgba(255,255,255,0.08)",
-              background: "rgba(8, 14, 24, 0.3)",
-              padding: 10,
-              fontSize: 8,
-              color: "var(--pixel-muted)",
-            }}
-          >
+          <div className="seat-hint">
             {busy
               ? "This seat is currently active. Finish or stop the task before changing crew assignment."
               : "Select a portrait, set name and role, then save. Empty seats can be assigned immediately."}
           </div>
 
-          <div
-            style={{
-              minHeight: 0,
-              overflowY: "auto",
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-              gap: 10,
-              paddingRight: 4,
-            }}
-          >
+          <div className="seat-manager__sprite-grid">
             {WORKER_SPRITES.map((sprite) => {
               const active = sprite.key === effectiveSpriteKey;
               return (
                 <button
                   key={sprite.key}
                   type="button"
+                  className={`seat-card ${active ? "seat-card--active" : ""}`}
                   onClick={() => {
                     if (!usingDraft) beginDraftForSeat(selectedSeat);
                     setSpriteKey(sprite.key);
@@ -374,29 +260,9 @@ export default function SeatManagerModal({
                     if (!effectiveName.trim()) setName(sprite.label);
                   }}
                   disabled={busy}
-                  style={{
-                    border: active ? "2px solid var(--pixel-accent)" : "2px solid rgba(255,255,255,0.08)",
-                    background: active ? "rgba(233, 69, 96, 0.14)" : "rgba(8, 14, 24, 0.45)",
-                    padding: 8,
-                    textAlign: "left",
-                    cursor: busy ? "not-allowed" : "pointer",
-                    fontFamily: "var(--pixel-font)",
-                    color: "var(--pixel-text)",
-                    opacity: busy ? 0.65 : 1,
-                  }}
+                  style={{ opacity: busy ? 0.65 : 1, cursor: busy ? "not-allowed" : "pointer" }}
                 >
-                  <div
-                    style={{
-                      width: "100%",
-                      height: 120,
-                      border: "2px solid rgba(255,255,255,0.08)",
-                      background: "#0d1b2a",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      overflow: "hidden",
-                    }}
-                  >
+                  <div className="seat-manager__sprite-preview">
                     <CharacterPortrait spritePath={sprite.path} name={sprite.label} />
                   </div>
                   <div style={{ fontSize: 9, marginTop: 8 }}>{sprite.label}</div>
@@ -407,24 +273,12 @@ export default function SeatManagerModal({
           </div>
 
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-            <button
-              type="button"
-              className="pixel-button"
-              onClick={handleUnassign}
-              disabled={!selectedSeat.assigned || busy}
-            >
+            <button type="button" className="pixel-button" onClick={handleUnassign} disabled={!selectedSeat.assigned || busy}>
               Unassign
             </button>
             <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" className="pixel-button" onClick={onClose}>
-                Close
-              </button>
-              <button
-                type="button"
-                className="pixel-button pixel-button--primary"
-                onClick={handleSave}
-                disabled={!canSave}
-              >
+              <button type="button" className="pixel-button" onClick={onClose}>Close</button>
+              <button type="button" className="pixel-button pixel-button--primary" onClick={handleSave} disabled={!canSave}>
                 {selectedSeat.assigned ? "Save Changes" : "Assign Character"}
               </button>
             </div>

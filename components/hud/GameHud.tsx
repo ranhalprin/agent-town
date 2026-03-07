@@ -19,14 +19,14 @@ export default function GameHud() {
   const activeSessionKey = state.activeSessionKey ?? "agent:main:main";
   const visibleTasks = useMemo(
     () => state.tasks.filter((task) => task.sessionKey === activeSessionKey),
-    [activeSessionKey, state.tasks]
+    [activeSessionKey, state.tasks],
   );
   const visibleMessages = useMemo(
     () =>
       state.chatMessages.filter(
-        (message) => message.sessionKey === activeSessionKey && isVisibleChatMessage(message)
+        (message) => message.sessionKey === activeSessionKey && isVisibleChatMessage(message),
       ),
-    [activeSessionKey, state.chatMessages]
+    [activeSessionKey, state.chatMessages],
   );
 
   const dockItems: HudDockItem[] = useMemo(
@@ -36,7 +36,7 @@ export default function GameHud() {
       { id: "tasks", label: "Tasks", icon: "/ui/icons/icon-tasks.png", iconActive: "/ui/icons/icon-tasks-active.png" },
       { id: "workers", label: "Employees", icon: "/ui/icons/icon-workers.png", iconActive: "/ui/icons/icon-workers-active.png" },
     ],
-    []
+    [],
   );
 
   const runningCount = visibleTasks.filter(
@@ -44,10 +44,10 @@ export default function GameHud() {
       task.status === "running" ||
       task.status === "submitted" ||
       task.status === "queued" ||
-      task.status === "returning"
+      task.status === "returning",
   ).length;
   const activeWorkers = state.seats.filter(
-    (seat) => seat.status === "running" || seat.status === "returning"
+    (seat) => seat.status === "running" || seat.status === "returning",
   ).length;
 
   const togglePanel = useCallback((id: HudPanelId) => {
@@ -55,30 +55,9 @@ export default function GameHud() {
   }, []);
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 20,
-        pointerEvents: "none",
-      }}
-    >
-      {/* Status cluster — top-right corner */}
-      <div
-        className="pixel-panel"
-        style={{
-          position: "absolute",
-          top: 8,
-          right: 12,
-          width: 280,
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-          padding: "8px 10px",
-          pointerEvents: "auto",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <div className="hud-overlay">
+      <div className="hud-status-cluster pixel-panel">
+        <div className="hud-status-cluster__row">
           <div className="hud-pill hud-pill--connection">
             <span
               className={`pixel-dot pixel-dot--${
@@ -105,7 +84,7 @@ export default function GameHud() {
           fresh={state.sessionMetrics.fresh}
         />
 
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div className="hud-status-cluster__row">
           <div className="hud-pill hud-pill--metric">
             <Sparkles size={12} />
             <span>{runningCount} running</span>
@@ -119,21 +98,9 @@ export default function GameHud() {
         </div>
       </div>
 
-      {/* Dock (horizontal, bottom-right) + flyout (pops upward) */}
-      <div
-        style={{
-          position: "absolute",
-          right: 12,
-          bottom: 20,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          gap: 8,
-          pointerEvents: "none",
-        }}
-      >
+      <div className="hud-dock-container">
         {openPanel ? (
-          <div style={{ pointerEvents: "auto" }}>
+          <div className="hud-dock-container__panel">
             {openPanel === "connection" ? <ConnectionPanel /> : null}
             {openPanel === "chat" ? (
               <ChatPanel
@@ -150,7 +117,7 @@ export default function GameHud() {
             ) : null}
           </div>
         ) : null}
-        <div style={{ pointerEvents: "auto" }}>
+        <div className="hud-dock-container__dock">
           <HudDock items={dockItems} openPanel={openPanel} onToggle={togglePanel} />
         </div>
       </div>

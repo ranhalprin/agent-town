@@ -40,18 +40,8 @@ export default function ToolBubble({ msg }: { msg: ChatMessage }) {
         {detail && (
           <button
             type="button"
+            className="hud-chat__tool-toggle"
             onClick={() => setExpanded((v) => !v)}
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--pixel-muted)",
-              cursor: "pointer",
-              fontFamily: "var(--pixel-font)",
-              fontSize: 7,
-              padding: "0 2px",
-              flexShrink: 0,
-              whiteSpace: "nowrap",
-            }}
           >
             {expanded ? "hide" : "show"}
           </button>

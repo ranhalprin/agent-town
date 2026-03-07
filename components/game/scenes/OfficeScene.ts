@@ -89,20 +89,24 @@ export class OfficeScene extends Phaser.Scene {
 
     const map = this.make.tilemap({ key: "office" });
 
-    const roomTileset = map.addTilesetImage("room_builder", "room_builder")!;
-    const officeTileset = map.addTilesetImage("modern_office", "modern_office")!;
+    const roomTileset = map.addTilesetImage("room_builder", "room_builder");
+    const officeTileset = map.addTilesetImage("modern_office", "modern_office");
+    if (!roomTileset || !officeTileset) {
+      console.error("[OfficeScene] Failed to load tilesets");
+      return;
+    }
     const allTilesets = [roomTileset, officeTileset];
 
-    map.createLayer("floor", allTilesets)!;
-    map.createLayer("walls", allTilesets)!;
-    map.createLayer("ground", allTilesets)!;
-    map.createLayer("furniture", allTilesets)!;
-    map.createLayer("objects", allTilesets)!;
+    map.createLayer("floor", allTilesets);
+    map.createLayer("walls", allTilesets);
+    map.createLayer("ground", allTilesets);
+    map.createLayer("furniture", allTilesets);
+    map.createLayer("objects", allTilesets);
 
     renderTileObjectLayer(this, map, "desktop", allTilesets, 5);
 
-    const overheadLayer = map.createLayer("overhead", allTilesets)!;
-    overheadLayer.setDepth(10);
+    const overheadLayer = map.createLayer("overhead", allTilesets);
+    if (overheadLayer) overheadLayer.setDepth(10);
 
     this.collisionGroup = this.physics.add.staticGroup();
     const collisionRects = buildCollisionRects(map, this.collisionGroup);
@@ -456,7 +460,9 @@ export class OfficeScene extends Phaser.Scene {
       .setDepth(20)
       .setVisible(false);
 
-    this.eKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    const kb = this.input.keyboard;
+    if (!kb) return;
+    this.eKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.E);
   }
 
   // ── Update ─────────────────────────────────────────────

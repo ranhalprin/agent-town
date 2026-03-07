@@ -1,169 +1,61 @@
-# Contributing to Agent World
+# Contributing
 
-Thanks for your interest in contributing.
+Thanks for your interest. This project mixes React/Next.js with a Phaser game layer, so the best contributions tend to be focused and easy to verify in the running game.
 
-This project combines a React/Next.js app with a Phaser-based simulation layer, so the best contributions are usually small, focused, and easy to verify in the running game.
+Designers, level designers, and game designers are just as welcome as engineers.
 
-We also welcome contributors from game design, level design, scene design, and interaction design backgrounds, not just application engineers.
-
-## Before You Start
-
-- Open an issue or start a discussion for large features, UI overhauls, or architecture changes.
-- Keep pull requests focused. One gameplay or system concern per PR is ideal.
-- If your change affects UX, include screenshots or a short video/GIF in the PR.
-
-## Development Setup
-
-### Requirements
-
-- `Node.js 22+`
-- `pnpm`
-- access to a compatible gateway backend if you want to test live execution
-
-### Install
+## Setup
 
 ```bash
 pnpm install
-```
-
-### Run locally
-
-```bash
 pnpm dev
 ```
 
-### Production build check
+You'll need Node.js 22+ and pnpm. For live agent execution, point `server.ts` at a running [OpenClaw](https://github.com/anthropics/openclaw) gateway.
 
-```bash
-pnpm build
-```
+## Ground rules
 
-## Project Expectations
+- Open an issue first for large features or architecture changes.
+- One concern per PR. Don't mix unrelated changes.
+- Include a screenshot or short recording for anything visual.
 
-When contributing, try to preserve the core shape of the project:
+## What we care about
 
 - Tasks should feel **spatial**, not abstract.
-- Worker behavior should remain **legible to the player**.
-- In-world interactions should take priority over hidden automation.
-- New UI should match the existing **pixel-game HUD style**.
-- Changes should avoid breaking mixed Chinese/English rendering.
-- New scenes should expand the world, not just add another hidden settings surface.
+- Worker behavior should be **readable at a glance**.
+- In-world interaction over hidden menus.
+- New UI should match the pixel HUD style.
+- New scenes should expand the world, not add settings pages.
 
-## Preferred Contribution Areas
+## Good contribution areas
 
-- gameplay feel and interaction clarity
-- game design and systems design
-- scene design, level layout, and environmental flow
-- worldbuilding for future spaces such as libraries, workshops, and world-map destinations
-- worker AI and pathing improvements
-- HUD readability and task visibility
-- session UX
-- tool call presentation
-- performance and code quality improvements
-- bug fixes with clear reproduction steps
+- Gameplay feel and interaction clarity
+- Scene and level design
+- Worker AI and pathfinding
+- HUD readability
+- Performance and code quality
+- Bug fixes with repro steps
 
-## Designers Are Welcome
+## For designers
 
-You do not need to contribute only through TypeScript code.
+You don't need to write TypeScript. Useful contributions include interaction proposals, scene flow mockups, level layouts, POI placement ideas, and economy/progression concepts for the marketplace expansion. Open an issue or draft to discuss before anyone writes code.
 
-Valuable contributions can also include:
+## Pull requests
 
-- interaction design proposals
-- scene flow mockups
-- level layout ideas
-- POI placement and pacing suggestions
-- economy and progression ideas for marketplace-style expansion
-- memory / tools / plugin management concepts that can be translated into playable spaces
+Include: what changed, why, and how to verify it. Run `pnpm build` before submitting.
 
-If you are contributing from a game design, level design, or UX background, feel free to open an issue or draft proposal before implementation details are settled.
+## Commits
 
-## Pull Request Guidelines
-
-Please include:
-
-- a short summary of the change
-- the reason for the change
-- how you tested it
-- screenshots or recordings for visible UI/gameplay changes
-
-Good PR descriptions usually answer:
-
-1. What changed?
-2. Why was it necessary?
-3. How should reviewers verify it?
-
-## Commit Message Style
-
-Use:
-
-```text
+```
 <type>(<scope>): <subject>
 ```
 
-Examples:
+Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `chore`
 
-```text
-feat(hud): add queued and returning task states
-fix(worker): delay gateway send until return to seat
-refactor(chat): simplify tool bubble rendering
-```
+## Code style
 
-Recommended types:
-
-- `feat`
-- `fix`
-- `docs`
-- `refactor`
-- `perf`
-- `test`
-- `chore`
-
-## Code Style Notes
-
-- Use TypeScript consistently.
-- Prefer explicit state transitions over hidden side effects.
-- Keep Phaser scene logic and React UI concerns separated.
-- Avoid introducing global mutable state unless absolutely necessary.
-- Prefer extracting constants instead of adding new magic numbers.
-- Preserve strict, readable event names when expanding the event bus.
-
-## Testing Changes
-
-At minimum, run:
-
-```bash
-pnpm build
-```
-
-If your change touches gameplay or UI behavior, also verify manually:
-
-- worker interaction with `Press E`
-- assigning tasks to a specific worker
-- queued / returning / sending / running transitions
-- session switching
-- chat readability
-- in-world bubble behavior
-
-## Asset Notes
-
-Do not assume commercial art assets can be redistributed.
-
-If your contribution needs new visual assets, prefer:
-
-- placeholders
-- clearly replaceable mock assets
-- instructions for where custom assets should be provided
-
-## Scope Discipline
-
-Please avoid combining unrelated changes in one PR. For example:
-
-- do not mix README cleanup with pathfinding changes
-- do not mix font fixes with session architecture work
-- do not refactor the whole store while also changing gameplay rules
-
-Smaller PRs are much easier to review and merge.
-
-## Questions
-
-If anything is unclear, open an issue or start a discussion before implementing a large change.
+- TypeScript throughout.
+- Phaser logic and React UI stay separated.
+- Explicit state transitions over hidden side effects.
+- Constants over magic numbers.
+- No global mutable state.

@@ -10,8 +10,8 @@ const pressStart2P = Press_Start_2P({
 });
 
 export const metadata: Metadata = {
-  title: "Agent World",
-  description: "Pixel-style AI Agent collaboration studio",
+  title: "Agent Town",
+  description: "A pixel office where AI agents work",
 };
 
 export default function RootLayout({

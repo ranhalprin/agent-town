@@ -54,12 +54,12 @@ export const STATUS_LABELS: Record<ConnectionStatus, string> = {
 };
 
 // ── Persistence keys ─────────────────────────────────────
-export const LS_CONFIG = "agent-world:gateway-config";
-export const LS_TASKS = "agent-world:tasks";
-export const LS_CHAT = "agent-world:chat";
-export const LS_SESSIONS = "agent-world:sessions";
-export const LS_ACTIVE_KEY = "agent-world:active-session-key";
-export const LS_SEAT_CONFIG = "agent-world:seat-config";
+export const LS_CONFIG = "agent-town:gateway-config";
+export const LS_TASKS = "agent-town:tasks";
+export const LS_CHAT = "agent-town:chat";
+export const LS_SESSIONS = "agent-town:sessions";
+export const LS_ACTIVE_KEY = "agent-town:active-session-key";
+export const LS_SEAT_CONFIG = "agent-town:seat-config";
 
 // ── Limits ───────────────────────────────────────────────
 export const MAX_CHAT = 500;
