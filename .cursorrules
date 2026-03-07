@@ -1,7 +1,0 @@
-### Commit Messages
-
-```
-<type>(<scope>): <subject>
-```
-
-Types: feat, fix, docs, style, refactor, perf, test, chore, build, ci. Imperative mood, lowercase, strictly under 100 chars total, no trailing period.
