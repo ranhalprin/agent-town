@@ -24,6 +24,8 @@ export interface POI {
 
 const WANDER_MIN_DELAY = 3000;
 const WANDER_MAX_DELAY = 10000;
+const WANDER_STAGGER_MS = 1800;
+const TASK_RESULT_HOLD_MS = 4500;
 const ARRIVE_THRESHOLD = 8;
 const WORKER_SPEED = MOVE_SPEED * 0.55;
 const BODY_WIDTH = FRAME_WIDTH * 0.5;
@@ -34,6 +36,8 @@ const HOME_NAV_OFFSET_X = BODY_OFFSET_X + BODY_WIDTH / 2 - FRAME_WIDTH / 2;
 const HOME_NAV_OFFSET_Y = BODY_OFFSET_Y + BODY_HEIGHT / 2 - FRAME_HEIGHT / 2;
 
 export class Worker {
+  private static lastWanderStartedAt = -Infinity;
+
   sprite: Phaser.Physics.Arcade.Sprite;
   bubble: ChatBubble;
   readonly seatId: string;
@@ -69,6 +73,8 @@ export class Worker {
 
   /** Wander system */
   private wanderTimer: Phaser.Time.TimerEvent | null = null;
+  private activityTimer: Phaser.Time.TimerEvent | null = null;
+  private taskVisualTimer: Phaser.Time.TimerEvent | null = null;
   private canWander = true;
   private isWandering = false;
   private pois: POI[] = [];
@@ -251,48 +257,63 @@ export class Worker {
       this.canWander = true;
       this.scheduleWander();
     } else if (status === "working") {
+      this.stopIdleActivity();
       this.showEmote("emote:thinking");
       this.canWander = false;
-      this.cancelWander();
     } else if (status === "done") {
-      this.showEmote("emote:heart");
+      this.canWander = false;
     } else if (status === "failed") {
-      this.showEmote("emote:fail");
+      this.canWander = false;
     }
   }
 
   // ── Task management ───────────────────────────────────
 
   assignTask(runId: string, taskMessage: string) {
+    this.stopIdleActivity();
     this.assignedRunId = runId;
     this.setStatus("working");
     this.showBubble(`📋 ${taskMessage}`, 4000);
-    this.scene.time.delayedCall(4200, () => {
+    if (this.taskVisualTimer) {
+      this.taskVisualTimer.destroy();
+      this.taskVisualTimer = null;
+    }
+    this.taskVisualTimer = this.scene.time.delayedCall(4200, () => {
       if (this._status === "working") this.showEmote("emote:thinking");
+      this.taskVisualTimer = null;
     });
-    this.cancelWander();
     this.returnHome();
   }
 
   completeTask() {
+    if (this.taskVisualTimer) {
+      this.taskVisualTimer.destroy();
+      this.taskVisualTimer = null;
+    }
     this.setStatus("done");
 
-    this.scene.time.delayedCall(6000, () => {
+    this.taskVisualTimer = this.scene.time.delayedCall(TASK_RESULT_HOLD_MS, () => {
       if (this._status === "done") {
         this.setStatus("idle");
         this.assignedRunId = null;
         this.processQueue();
       }
+      this.taskVisualTimer = null;
     });
   }
 
   failTask() {
+    if (this.taskVisualTimer) {
+      this.taskVisualTimer.destroy();
+      this.taskVisualTimer = null;
+    }
     this.setStatus("failed");
     this.showBubble("Task failed.", 4000);
-    this.scene.time.delayedCall(4000, () => {
+    this.taskVisualTimer = this.scene.time.delayedCall(TASK_RESULT_HOLD_MS, () => {
       this.assignedRunId = null;
       this.setStatus("idle");
       this.processQueue();
+      this.taskVisualTimer = null;
     });
   }
 
@@ -307,6 +328,21 @@ export class Worker {
     if (this.taskQueue.length === 0) return;
     const next = this.taskQueue.shift()!;
     this.assignTask(next.runId, next.message);
+  }
+
+  private stopIdleActivity() {
+    if (this.wanderTimer) {
+      this.wanderTimer.destroy();
+      this.wanderTimer = null;
+    }
+    if (this.activityTimer) {
+      this.activityTimer.destroy();
+      this.activityTimer = null;
+    }
+    this.onArrival = null;
+    this.isWandering = false;
+    this.hideEmote();
+    this.bubble.hide();
   }
 
   setPOIs(pois: POI[]) {
@@ -514,17 +550,12 @@ export class Worker {
 
     const delay = Phaser.Math.Between(WANDER_MIN_DELAY, WANDER_MAX_DELAY);
     this.wanderTimer = this.scene.time.delayedCall(delay, () => {
-      if (!this.canWander || this._status !== "idle") return;
-      this.startWander();
+      this.tryStartWander();
     });
   }
 
   private cancelWander() {
-    if (this.wanderTimer) {
-      this.wanderTimer.destroy();
-      this.wanderTimer = null;
-    }
-    this.isWandering = false;
+    this.stopIdleActivity();
   }
 
   private startWander() {
@@ -537,20 +568,39 @@ export class Worker {
     }
   }
 
+  private tryStartWander() {
+    if (!this.canWander || this._status !== "idle") return;
+
+    const now = this.scene.time.now;
+    const sinceLast = now - Worker.lastWanderStartedAt;
+    if (sinceLast < WANDER_STAGGER_MS) {
+      const extraDelay = WANDER_STAGGER_MS - sinceLast + Phaser.Math.Between(250, 1200);
+      this.wanderTimer = this.scene.time.delayedCall(extraDelay, () => {
+        this.tryStartWander();
+      });
+      return;
+    }
+
+    Worker.lastWanderStartedAt = now;
+    this.startWander();
+  }
+
   /** Walk to a random POI, stay, then return */
   private wanderToPoi() {
     const poi = Phaser.Utils.Array.GetRandom(this.pois) as POI;
     this.isWandering = true;
     this.arrivalFacing = this.poiFacing(poi.name);
-    this.showEmote("emote:music");
 
     this.onArrival = () => {
       if (this._status !== "idle" || !this.canWander) return;
-      this.hideEmote();
       this.showBubble(Worker.poiBubbleText(poi.name), 3000);
 
       const stayDuration = Phaser.Math.Between(3000, 6000);
-      this.scene.time.delayedCall(stayDuration, () => {
+      if (this.activityTimer) {
+        this.activityTimer.destroy();
+        this.activityTimer = null;
+      }
+      this.activityTimer = this.scene.time.delayedCall(stayDuration, () => {
         if (this._status !== "idle" || !this.canWander) return;
         this.onArrival = () => {
           this.isWandering = false;
@@ -558,6 +608,7 @@ export class Worker {
           this.scheduleWander();
         };
         this.navigateHome();
+        this.activityTimer = null;
       });
     };
 
@@ -584,10 +635,15 @@ export class Worker {
 
     this.showEmote(act.emote);
 
-    this.wanderTimer = this.scene.time.delayedCall(act.duration, () => {
+    if (this.activityTimer) {
+      this.activityTimer.destroy();
+      this.activityTimer = null;
+    }
+    this.activityTimer = this.scene.time.delayedCall(act.duration, () => {
       if (this._status !== "idle" || !this.canWander) return;
       this.hideEmote();
       this.scheduleWander();
+      this.activityTimer = null;
     });
   }
 
@@ -684,6 +740,7 @@ export class Worker {
 
   destroy() {
     this.cancelWander();
+    if (this.taskVisualTimer) this.taskVisualTimer.destroy();
     this.sprite.destroy();
     this.nameTag.destroy();
     this.statusDot.destroy();

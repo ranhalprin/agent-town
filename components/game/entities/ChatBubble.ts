@@ -7,6 +7,8 @@ const BUBBLE_RADIUS = 6;
 const TAIL_SIZE = 6;
 const FADE_DURATION = 400;
 const DEFAULT_TTL = 5000;
+const BUBBLE_FONT_SIZE = 6;
+const BUBBLE_FONT_FAMILY = '"Press Start 2P", "Zpix", monospace';
 
 export class ChatBubble {
   private container: Phaser.GameObjects.Container;
@@ -14,22 +16,53 @@ export class ChatBubble {
   private text: Phaser.GameObjects.Text;
   private scene: Phaser.Scene;
   private fadeTimer: Phaser.Time.TimerEvent | null = null;
+  private measureCtx: CanvasRenderingContext2D | null = null;
 
   constructor(scene: Phaser.Scene, depth = 25) {
     this.scene = scene;
     this.bg = scene.add.graphics();
     this.text = scene.add.text(0, 0, "", {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: "6px",
+      fontFamily: BUBBLE_FONT_FAMILY,
+      fontSize: `${BUBBLE_FONT_SIZE}px`,
       color: "#1a1a2e",
-      wordWrap: { width: BUBBLE_MAX_WIDTH - BUBBLE_PAD_X * 2 },
       lineSpacing: 4,
     });
     this.text.setOrigin(0, 0);
+    this.measureCtx = document.createElement("canvas").getContext("2d");
+    if (this.measureCtx) {
+      this.measureCtx.font = `${BUBBLE_FONT_SIZE}px ${BUBBLE_FONT_FAMILY}`;
+    }
 
     this.container = scene.add.container(0, 0, [this.bg, this.text]);
     this.container.setDepth(depth);
     this.container.setVisible(false);
+  }
+
+  private wrapText(input: string) {
+    const maxWidth = BUBBLE_MAX_WIDTH - BUBBLE_PAD_X * 2;
+    if (!this.measureCtx) return input;
+
+    const wrappedLines: string[] = [];
+    for (const paragraph of input.split("\n")) {
+      if (!paragraph) {
+        wrappedLines.push("");
+        continue;
+      }
+
+      let line = "";
+      for (const char of paragraph) {
+        const candidate = line + char;
+        if (line && this.measureCtx.measureText(candidate).width > maxWidth) {
+          wrappedLines.push(line);
+          line = char;
+        } else {
+          line = candidate;
+        }
+      }
+      if (line) wrappedLines.push(line);
+    }
+
+    return wrappedLines.join("\n");
   }
 
   show(message: string, anchorX: number, anchorY: number, ttl = DEFAULT_TTL) {
@@ -39,7 +72,7 @@ export class ChatBubble {
     }
 
     const displayText = message.length > 100 ? message.slice(0, 97) + "..." : message;
-    this.text.setText(displayText);
+    this.text.setText(this.wrapText(displayText));
 
     const textW = Math.min(this.text.width, BUBBLE_MAX_WIDTH - BUBBLE_PAD_X * 2);
     const textH = this.text.height;

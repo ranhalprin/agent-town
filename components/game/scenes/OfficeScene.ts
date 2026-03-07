@@ -19,11 +19,13 @@ import {
 } from "../config/emotes";
 import { Pathfinder } from "../utils/Pathfinder";
 import { gameEvents } from "@/lib/events";
+import type { SeatState } from "@/types/game";
 
 const INTERACT_DISTANCE = 48;
 const BOSS_INTERACT_DISTANCE = 34;
 
 interface SeatDef {
+  seatId: string;
   x: number;
   y: number;
   facing: Direction;
@@ -39,6 +41,7 @@ export class OfficeScene extends Phaser.Scene {
 
   private workers: Worker[] = [];
   private runWorkerMap = new Map<string, Worker>();
+  private seatDefs: SeatDef[] = [];
   private collisionGroup!: Phaser.Physics.Arcade.StaticGroup;
   private pathfinder!: Pathfinder;
   private pois: POI[] = [];
@@ -128,6 +131,7 @@ export class OfficeScene extends Phaser.Scene {
     this.pathfinder = new Pathfinder(map.widthInPixels, map.heightInPixels, collisionRects, 8);
 
     const { bossSpawn, workerSpawns } = this.parseSpawns(map);
+    this.seatDefs = workerSpawns;
 
     this.player = new Player(this, bossSpawn.x, bossSpawn.y);
     this.physics.add.collider(this.player.sprite, this.collisionGroup);
@@ -151,9 +155,9 @@ export class OfficeScene extends Phaser.Scene {
 
     this.parsePOIs(map);
     this.initBossSeat(bossSpawn);
-    this.initWorkers(workerSpawns);
     this.initInteractionUI();
     this.initGameEvents();
+    gameEvents.emit("seats-discovered", workerSpawns);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanupGameEvents());
     this.events.once(Phaser.Scenes.Events.DESTROY, () => this.cleanupGameEvents());
@@ -229,7 +233,8 @@ export class OfficeScene extends Phaser.Scene {
 
     const workerSpawns: SeatDef[] = spawnsLayer.objects
       .filter((obj) => obj !== bossObj)
-      .map((obj) => ({
+      .map((obj, index) => ({
+        seatId: obj.name && obj.name !== "boss" ? obj.name : `seat-${index}`,
         x: obj.x!,
         y: obj.y!,
         facing: getFacing(obj),
@@ -253,20 +258,75 @@ export class OfficeScene extends Phaser.Scene {
 
   // ── Workers ──────────────────────────────────────────────
 
-  private initWorkers(seats: SeatDef[]) {
-    const available = WORKER_SPRITES.slice(0, seats.length);
+  private spawnWorker(seatDef: SeatDef, seat: SeatState) {
+    if (!seat.spriteKey) return null;
+    const initialFacing: Direction = seat.spriteKey === "character_06" ? "right" : seatDef.facing;
+    const worker = new Worker(
+      this,
+      seatDef.x,
+      seatDef.y,
+      seat.spriteKey,
+      seatDef.seatId,
+      seat.label,
+      initialFacing,
+    );
+    worker.setPOIs(this.pois);
+    worker.setPathfinder(this.pathfinder);
+    worker.sprite.setCollideWorldBounds(true);
+    return worker;
+  }
 
-    for (let i = 0; i < available.length; i++) {
-      const seat = seats[i];
-      const cfg = available[i];
-      const facing: Direction = cfg.label === "Eve" ? "right" : seat.facing;
-      const worker = new Worker(this, seat.x, seat.y, cfg.key, `seat-${i}`, cfg.label, facing);
-      worker.setPOIs(this.pois);
-      worker.setPathfinder(this.pathfinder);
-      this.workers.push(worker);
+  private syncWorkers(seats: SeatState[]) {
+    const nextBySeatId = new Map(
+      seats
+        .filter((seat) => seat.assigned && seat.spriteKey)
+        .map((seat) => [seat.seatId, seat]),
+    );
+    const existingBySeatId = new Map(this.workers.map((worker) => [worker.seatId, worker]));
+    const nextWorkers: Worker[] = [];
 
-      worker.sprite.setCollideWorldBounds(true);
+    for (const seatDef of this.seatDefs) {
+      const seat = nextBySeatId.get(seatDef.seatId);
+      const existing = existingBySeatId.get(seatDef.seatId);
+
+      if (!seat) {
+        if (existing) {
+          if (existing.assignedRunId) this.runWorkerMap.delete(existing.assignedRunId);
+          if (this.nearestWorker === existing) this.nearestWorker = null;
+          existing.destroy();
+          existingBySeatId.delete(seatDef.seatId);
+        }
+        continue;
+      }
+
+      const needsRecreate =
+        !existing ||
+        existing.spriteKey !== seat.spriteKey ||
+        existing.label !== seat.label;
+
+      if (needsRecreate) {
+        if (existing) {
+          if (existing.assignedRunId) this.runWorkerMap.delete(existing.assignedRunId);
+          if (this.nearestWorker === existing) this.nearestWorker = null;
+          existing.destroy();
+          existingBySeatId.delete(seatDef.seatId);
+        }
+        const created = this.spawnWorker(seatDef, seat);
+        if (created) nextWorkers.push(created);
+        continue;
+      }
+
+      nextWorkers.push(existing);
+      existingBySeatId.delete(seatDef.seatId);
     }
+
+    for (const stale of existingBySeatId.values()) {
+      if (stale.assignedRunId) this.runWorkerMap.delete(stale.assignedRunId);
+      if (this.nearestWorker === stale) this.nearestWorker = null;
+      stale.destroy();
+    }
+
+    this.workers = nextWorkers;
   }
 
   // ── Interaction UI ───────────────────────────────────────
@@ -316,7 +376,7 @@ export class OfficeScene extends Phaser.Scene {
 
     const options: MenuOption[] = [
       {
-        label: "Dispatch Task",
+        label: "Assign Task",
         enabled: true,
         action: () => {
           this.menuOpen = false;
@@ -361,6 +421,11 @@ export class OfficeScene extends Phaser.Scene {
 
   private initGameEvents() {
     this.cleanupGameEvents();
+
+    this.gameEventUnsubs.push(gameEvents.on("seat-configs-updated", (seats: unknown) => {
+      if (!Array.isArray(seats)) return;
+      this.syncWorkers(seats as SeatState[]);
+    }));
 
     this.gameEventUnsubs.push(gameEvents.on("task-assigned", (runId: unknown, message: unknown, seatId: unknown) => {
       const targetSeatId = typeof seatId === "string" ? seatId : undefined;

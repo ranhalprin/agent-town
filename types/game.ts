@@ -14,11 +14,20 @@ export type ConnectionStatus =
   | "connected"
   | "error";
 
+export type SeatFacing = "right" | "up" | "left" | "down";
+
 export type SeatStatus = "empty" | "running" | "done" | "failed";
 
 export interface SeatState {
   seatId: string;
   label: string;
+  roleTitle?: string;
+  assigned?: boolean;
+  spriteKey?: string;
+  spritePath?: string;
+  spawnX?: number;
+  spawnY?: number;
+  spawnFacing?: SeatFacing;
   status: SeatStatus;
   taskSnippet?: string;
   runId?: string;
@@ -37,6 +46,7 @@ export interface TaskItem {
   message: string;
   status: TaskStatus;
   runId?: string;
+  actorName?: string;
   result?: string;
   createdAt: string;
   completedAt?: string;
@@ -48,6 +58,7 @@ export interface ChatMessage {
   role: "user" | "assistant" | "tool" | "system";
   content: string;
   timestamp: string;
+  actorName?: string;
   /** true while assistant message is still receiving streaming deltas */
   streaming?: boolean;
   /** tool call: structured name + input + output */

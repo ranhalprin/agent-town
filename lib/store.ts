@@ -33,6 +33,7 @@ const LS_TASKS = "agent-world:tasks";
 const LS_CHAT = "agent-world:chat";
 const LS_SESSIONS = "agent-world:sessions";
 const LS_ACTIVE_KEY = "agent-world:active-session-key";
+const LS_SEAT_CONFIG = "agent-world:seat-config";
 const MAX_CHAT = 500;
 const MAX_SESSIONS = 20;
 const CONNECTED_TO_PREFIX = "Connected to ";
@@ -64,11 +65,34 @@ function isRedundantConnectionMessage(msg: ChatMessage): boolean {
   return msg.role === "system" && msg.content.startsWith(CONNECTED_TO_PREFIX);
 }
 
+interface DiscoveredSeat {
+  seatId: string;
+  x: number;
+  y: number;
+  facing?: SeatState["spawnFacing"];
+  index: number;
+}
+
+interface PersistedSeatConfig {
+  seatId: string;
+  label?: string;
+  roleTitle?: string;
+  assigned?: boolean;
+  spriteKey?: string;
+  spritePath?: string;
+}
+
 function createInitialSeats(): SeatState[] {
-  return WORKER_SPRITES.map((worker, index) => ({
-    seatId: `seat-${index}`,
-    label: worker.label,
-    status: "empty",
+  return [];
+}
+
+function resetSeatRuntime(seats: SeatState[]) {
+  return seats.map((seat) => ({
+    ...seat,
+    status: "empty" as const,
+    runId: undefined,
+    taskSnippet: undefined,
+    startedAt: undefined,
   }));
 }
 
@@ -90,13 +114,58 @@ function patchTasks(tasks: TaskItem[], taskId: string, patch: Partial<TaskItem>)
 }
 
 function findAssignableSeatIndex(seats: SeatState[]) {
-  const available = seats.findIndex((seat) => seat.status !== "running");
+  const available = seats.findIndex((seat) => seat.assigned && seat.status !== "running");
   return available >= 0 ? available : -1;
 }
 
 function findSeatIndexById(seats: SeatState[], seatId?: string) {
   if (!seatId) return -1;
   return seats.findIndex((seat) => seat.seatId === seatId);
+}
+
+function resolveSeatLabelForTask(seats: SeatState[], seatId?: string) {
+  if (seatId) {
+    return seats.find((seat) => seat.seatId === seatId)?.label;
+  }
+  const seatIndex = findAssignableSeatIndex(seats);
+  return seatIndex >= 0 ? seats[seatIndex]?.label : undefined;
+}
+
+function mergeDiscoveredSeats(
+  discovered: DiscoveredSeat[],
+  storedConfigs: PersistedSeatConfig[],
+  currentSeats: SeatState[],
+): SeatState[] {
+  const storedById = new Map(storedConfigs.map((seat) => [seat.seatId, seat]));
+  const currentById = new Map(currentSeats.map((seat) => [seat.seatId, seat]));
+
+  return discovered.map((seat, index) => {
+    const stored = storedById.get(seat.seatId);
+    const runtime = currentById.get(seat.seatId);
+    const fallback = WORKER_SPRITES[index];
+
+    const assigned = stored?.assigned ?? Boolean(fallback);
+    const spriteKey = stored?.spriteKey ?? fallback?.key;
+    const spritePath = stored?.spritePath ?? fallback?.path;
+    const label = stored?.label ?? fallback?.label ?? `Seat ${index + 1}`;
+    const roleTitle = stored?.roleTitle ?? (assigned ? "Agent" : undefined);
+
+    return {
+      seatId: seat.seatId,
+      label,
+      roleTitle,
+      assigned,
+      spriteKey: assigned ? spriteKey : undefined,
+      spritePath: assigned ? spritePath : undefined,
+      spawnX: seat.x,
+      spawnY: seat.y,
+      spawnFacing: seat.facing,
+      status: runtime?.status ?? "empty",
+      runId: runtime?.runId,
+      taskSnippet: runtime?.taskSnippet,
+      startedAt: runtime?.startedAt,
+    };
+  });
 }
 
 // ── State / Actions / Reducer ─────────────────────────────
@@ -116,12 +185,15 @@ type Action =
   | { type: "ADD_TASK"; task: TaskItem }
   | { type: "UPDATE_TASK"; taskId: string; patch: Partial<TaskItem> }
   | { type: "APPEND_CHAT"; message: ChatMessage }
-  | { type: "APPEND_DELTA"; runId: string; delta: string }
-  | { type: "FINALIZE_ASSISTANT"; runId: string; content: string }
+  | { type: "APPEND_DELTA"; runId: string; delta: string; actorName?: string }
+  | { type: "FINALIZE_ASSISTANT"; runId: string; content: string; actorName?: string }
+  | { type: "SET_RUN_ACTOR"; runId: string; actorName: string }
   | { type: "SET_ACTIVE_SESSION"; sessionKey?: string }
   | { type: "SET_SESSION_METRICS"; metrics: SessionMetrics }
   | { type: "ASSIGN_SEAT"; runId: string; taskSnippet: string; seatId?: string }
   | { type: "SET_SEAT_STATUS"; runId: string; status: SeatState["status"] }
+  | { type: "SYNC_SEATS"; seats: SeatState[] }
+  | { type: "UPDATE_SEAT_CONFIG"; seatId: string; patch: Partial<SeatState> }
   | { type: "RESET_SEATS" }
   | { type: "RESTORE"; tasks: TaskItem[]; chatMessages: ChatMessage[]; sessions: SessionRecord[] }
   | { type: "NEW_SESSION"; session: SessionRecord }
@@ -164,6 +236,7 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
         msgs[idx] = {
           ...msgs[idx],
           content: msgs[idx].content + action.delta,
+          actorName: msgs[idx].actorName ?? action.actorName,
           streaming: true,
         };
       } else {
@@ -173,6 +246,7 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
           role: "assistant",
           content: action.delta,
           timestamp: new Date().toISOString(),
+          actorName: action.actorName,
           streaming: true,
         });
       }
@@ -189,7 +263,12 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
         }
       }
       if (fi >= 0) {
-        all[fi] = { ...all[fi], content: action.content, streaming: false };
+        all[fi] = {
+          ...all[fi],
+          content: action.content,
+          actorName: all[fi].actorName ?? action.actorName,
+          streaming: false,
+        };
       } else {
         all.push({
           id: chatId(),
@@ -197,11 +276,22 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
           role: "assistant",
           content: action.content,
           timestamp: new Date().toISOString(),
+          actorName: action.actorName,
           streaming: false,
         });
       }
       return { ...state, chatMessages: all };
     }
+
+    case "SET_RUN_ACTOR":
+      return {
+        ...state,
+        chatMessages: state.chatMessages.map((msg) =>
+          msg.runId === action.runId && msg.role === "assistant"
+            ? { ...msg, actorName: action.actorName }
+            : msg
+        ),
+      };
 
     case "SET_ACTIVE_SESSION":
       return { ...state, activeSessionKey: action.sessionKey };
@@ -252,8 +342,31 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
       return { ...state, seats };
     }
 
+    case "SYNC_SEATS":
+      return { ...state, seats: action.seats };
+
+    case "UPDATE_SEAT_CONFIG":
+      return {
+        ...state,
+        seats: state.seats.map((seat) => {
+          if (seat.seatId !== action.seatId) return seat;
+          const next = { ...seat, ...action.patch };
+          if (!next.assigned) {
+            next.label = seat.label;
+            next.roleTitle = undefined;
+            next.spriteKey = undefined;
+            next.spritePath = undefined;
+            next.status = "empty";
+            next.runId = undefined;
+            next.taskSnippet = undefined;
+            next.startedAt = undefined;
+          }
+          return next;
+        }),
+      };
+
     case "RESET_SEATS":
-      return { ...state, seats: createInitialSeats() };
+      return { ...state, seats: resetSeatRuntime(state.seats) };
 
     case "RESTORE":
       return {
@@ -271,7 +384,7 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
         chatMessages: [],
         activeSessionKey: action.session.key,
         sessionMetrics: createEmptySessionMetrics(),
-        seats: createInitialSeats(),
+        seats: resetSeatRuntime(state.seats),
         sessions: [action.session, ...existingSessions].slice(0, MAX_SESSIONS),
       };
     }
@@ -297,7 +410,7 @@ function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
         chatMessages: action.chatMessages.filter((m) => !isRedundantConnectionMessage(m)),
         activeSessionKey: action.sessionKey,
         sessionMetrics: createEmptySessionMetrics(),
-        seats: createInitialSeats(),
+        seats: resetSeatRuntime(state.seats),
       };
 
     default:
@@ -312,6 +425,7 @@ interface StudioContextValue {
   connect: (config?: GatewayConfig) => void;
   disconnect: () => void;
   dispatchTask: (message: string, seatId?: string) => void;
+  updateSeatConfig: (seatId: string, patch: Partial<SeatState>) => void;
   newSession: () => void;
   switchSession: (sessionKey: string) => void;
 }
@@ -380,6 +494,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const dispatchRef = useRef<Dispatch<Action>>(dispatch);
   dispatchRef.current = dispatch;
+  const seatsRef = useRef<SeatState[]>(state.seats);
+  seatsRef.current = state.seats;
+  const seatConfigRef = useRef<PersistedSeatConfig[]>([]);
+  const runActorRef = useRef(new Map<string, string>());
 
   const clientRef = useRef<GatewayClient | null>(null);
   const configRef = useRef<GatewayConfig>({ url: DEFAULT_URL, token: DEFAULT_TOKEN });
@@ -536,6 +654,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             });
             const label = (data.label as string) ?? "sub-task";
             gameEvents.emit("subagent-assigned", runId, runId, label);
+            runActorRef.current.set(runId, label);
+            dispatchRef.current({ type: "SET_RUN_ACTOR", runId, actorName: label });
             dispatchRef.current({
               type: "APPEND_CHAT",
               message: {
@@ -616,7 +736,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           bubbleAccum.set(runId, accum);
           const display = accum.length > 80 ? "..." + accum.slice(-77) : accum;
           gameEvents.emit("task-bubble", runId, display, 4000);
-          dispatchRef.current({ type: "APPEND_DELTA", runId, delta });
+          dispatchRef.current({
+            type: "APPEND_DELTA",
+            runId,
+            delta,
+            actorName: runActorRef.current.get(runId),
+          });
         }
       }
     });
@@ -640,7 +765,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           patch: { status: "completed", completedAt: new Date().toISOString(), result: text },
         });
         if (text) {
-          dispatchRef.current({ type: "FINALIZE_ASSISTANT", runId, content: text });
+          dispatchRef.current({
+            type: "FINALIZE_ASSISTANT",
+            runId,
+            content: text,
+            actorName: runActorRef.current.get(runId),
+          });
         }
         scheduleSessionMetricsRefresh(400);
       } else if (eventState === "error" || eventState === "aborted") {
@@ -720,6 +850,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     const tasks = lsGet<TaskItem[]>(LS_TASKS, []);
     const chat = lsGet<ChatMessage[]>(LS_CHAT, []);
     const sessions = lsGet<SessionRecord[]>(LS_SESSIONS, []);
+    const seatConfigs = lsGet<PersistedSeatConfig[]>(LS_SEAT_CONFIG, []);
+    seatConfigRef.current = seatConfigs;
     const savedActiveKey = lsGet<string | null>(LS_ACTIVE_KEY, null);
     if (savedActiveKey) {
       activeSessionKeyRef.current = savedActiveKey;
@@ -731,10 +863,20 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "SET_ACTIVE_SESSION", sessionKey: savedActiveKey });
     }
 
+    const unsubSeats = gameEvents.on("seats-discovered", (payload: unknown) => {
+      const discovered = Array.isArray(payload) ? payload as DiscoveredSeat[] : [];
+      const mergedSeats = mergeDiscoveredSeats(discovered, seatConfigRef.current, seatsRef.current);
+      dispatchRef.current({ type: "SYNC_SEATS", seats: mergedSeats });
+    });
+
     if (savedConfig?.url) {
       const t = setTimeout(() => connectImpl(savedConfig), 80);
-      return () => clearTimeout(t);
+      return () => {
+        clearTimeout(t);
+        unsubSeats();
+      };
     }
+    return unsubSeats;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -745,6 +887,20 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     lsSet(LS_CHAT, state.chatMessages.slice(-200));
     lsSet(LS_SESSIONS, state.sessions.slice(0, MAX_SESSIONS));
   }, [state.tasks, state.chatMessages, state.sessions]);
+
+  useEffect(() => {
+    const configs: PersistedSeatConfig[] = state.seats.map((seat) => ({
+      seatId: seat.seatId,
+      label: seat.label,
+      roleTitle: seat.roleTitle,
+      assigned: seat.assigned,
+      spriteKey: seat.spriteKey,
+      spritePath: seat.spritePath,
+    }));
+    seatConfigRef.current = configs;
+    lsSet(LS_SEAT_CONFIG, configs);
+    gameEvents.emit("seat-configs-updated", state.seats);
+  }, [state.seats]);
 
   // ── Cleanup ──
 
@@ -777,11 +933,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     dispatchRef.current({ type: "SET_SESSION_METRICS", metrics: createEmptySessionMetrics() });
   }, [setActiveSessionKey]);
 
+  const updateSeatConfig = useCallback((seatId: string, patch: Partial<SeatState>) => {
+    dispatchRef.current({ type: "UPDATE_SEAT_CONFIG", seatId, patch });
+  }, []);
+
   const dispatchTask = useCallback((message: string, seatId?: string) => {
     const client = clientRef.current;
     if (!client || client.status !== "connected") return;
 
     const idempotencyKey = `aw_task_${++taskCounter}_${Date.now()}`;
+    const actorName = resolveSeatLabelForTask(seatsRef.current, seatId);
 
     dispatchRef.current({
       type: "ADD_TASK",
@@ -789,6 +950,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         taskId: idempotencyKey,
         message,
         status: "submitted",
+        actorName,
         createdAt: new Date().toISOString(),
       },
     });
@@ -812,6 +974,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       })
       .then((res: GatewayFrame) => {
         const runId = res.payload?.runId as string | undefined;
+        const finalRunId = runId ?? idempotencyKey;
+        if (actorName) {
+          runActorRef.current.set(finalRunId, actorName);
+          dispatchRef.current({ type: "SET_RUN_ACTOR", runId: finalRunId, actorName });
+        }
         dispatchRef.current({
           type: "UPDATE_TASK",
           taskId: idempotencyKey,
@@ -819,11 +986,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         });
         dispatchRef.current({
           type: "ASSIGN_SEAT",
-          runId: runId ?? idempotencyKey,
+          runId: finalRunId,
           taskSnippet: message.slice(0, 28),
           seatId,
         });
-        gameEvents.emit("task-assigned", runId ?? idempotencyKey, message, seatId);
+        gameEvents.emit("task-assigned", finalRunId, message, seatId);
         scheduleSessionMetricsRefresh(300);
       })
       .catch((err: Error) => {
@@ -953,7 +1120,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   return React.createElement(
     StudioContext.Provider,
-    { value: { state, connect, disconnect, dispatchTask, newSession, switchSession } },
+    { value: { state, connect, disconnect, dispatchTask, updateSeatConfig, newSession, switchSession } },
     children,
   );
 }

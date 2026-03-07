@@ -14,6 +14,7 @@ import { getDefaultGatewayUrl } from "@/lib/utils";
 import ContextMeter from "./ContextMeter";
 import HudDock, { type HudDockItem, type HudPanelId } from "./HudDock";
 import HudFlyout from "./HudFlyout";
+import SeatManagerModal from "./SeatManagerModal";
 
 const LS_CONFIG = "agent-world:gateway-config";
 const DEFAULT_URL = getDefaultGatewayUrl();
@@ -106,7 +107,7 @@ function ToolBubble({ msg }: { msg: ChatMessage }) {
   );
 }
 
-function MessageBubble({ msg }: { msg: ChatMessage }) {
+function MessageBubble({ msg, actorName }: { msg: ChatMessage; actorName?: string }) {
   if (msg.role === "system") {
     return <div className="hud-chat__system">{msg.content}</div>;
   }
@@ -121,7 +122,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
         msg.role === "user" ? "hud-chat__bubble--user" : "hud-chat__bubble--assistant"
       }`}
     >
-      <div className="hud-chat__role">{msg.role === "user" ? "You" : "AI"}</div>
+      <div className="hud-chat__role">{msg.role === "user" ? "You" : msg.actorName ?? actorName ?? "Assistant"}</div>
       <div className="hud-chat__content">
         {msg.content}
         {msg.streaming ? <span className="pixel-cursor">▌</span> : null}
@@ -326,11 +327,13 @@ function SessionSwitcher({
 
 function ChatPanel({
   messages,
+  tasks,
   isConnected,
   sessions,
   activeSessionKey,
 }: {
   messages: ChatMessage[];
+  tasks: TaskItem[];
   isConnected: boolean;
   sessions: SessionRecord[];
   activeSessionKey?: string;
@@ -375,7 +378,13 @@ function ChatPanel({
           {messages.length === 0 ? (
             <div className="hud-empty">No conversation yet. Type a message to begin.</div>
           ) : (
-            messages.map((message) => <MessageBubble key={message.id} msg={message} />)
+            messages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                msg={message}
+                actorName={tasks.find((task) => task.runId === message.runId || task.taskId === message.runId)?.actorName}
+              />
+            ))
           )}
         </div>
 
@@ -430,19 +439,40 @@ function TaskPanel({ tasks }: { tasks: TaskItem[] }) {
   );
 }
 
-function WorkerPanel({ seats }: { seats: SeatState[] }) {
+function WorkerPanel({
+  seats,
+  onOpenManager,
+}: {
+  seats: SeatState[];
+  onOpenManager: () => void;
+}) {
   const active = seats.filter((seat) => seat.status === "running").length;
 
   return (
-    <HudFlyout title="Workers" subtitle={`${active}/${seats.length} currently busy`}>
+    <HudFlyout
+      title="Employees"
+      subtitle={`${active}/${seats.length} currently busy`}
+      headerAction={
+        <button
+          type="button"
+          className="pixel-button pixel-button--primary"
+          style={{ fontSize: 7, padding: "4px 8px" }}
+          onClick={onOpenManager}
+        >
+          Manage Seats
+        </button>
+      }
+    >
       <div className="hud-workers">
         {seats.map((seat) => (
           <div key={seat.seatId} className="hud-workers__item">
             <div className="hud-workers__top">
-              <span className={`hud-status hud-status--${seat.status}`}>{seat.status}</span>
-              <span>{seat.label}</span>
+              <span className={`hud-status hud-status--${seat.status}`}>{seat.assigned ? seat.status : "vacant"}</span>
+              <span>{seat.assigned ? seat.label : "Vacant Seat"}</span>
             </div>
-            <div className="hud-workers__task">{seat.taskSnippet ?? "Waiting at desk"}</div>
+            <div className="hud-workers__task">
+              {seat.assigned ? seat.taskSnippet ?? `${seat.roleTitle ?? "Agent"} waiting at desk` : "Assign a crew member to this seat"}
+            </div>
           </div>
         ))}
       </div>
@@ -453,6 +483,7 @@ function WorkerPanel({ seats }: { seats: SeatState[] }) {
 export default function GameHud() {
   const { state } = useStudio();
   const [openPanel, setOpenPanel] = useState<HudPanelId | null>(null);
+  const [seatManagerOpen, setSeatManagerOpen] = useState(false);
   const visibleMessages = useMemo(
     () =>
       state.chatMessages.filter(
@@ -467,7 +498,7 @@ export default function GameHud() {
       { id: "connection", label: "Connection", icon: "/ui/icons/icon-connection.png", iconActive: "/ui/icons/icon-connection-active.png" },
       { id: "chat", label: "Chat", icon: "/ui/icons/icon-chat.png", iconActive: "/ui/icons/icon-chat-active.png" },
       { id: "tasks", label: "Tasks", icon: "/ui/icons/icon-tasks.png", iconActive: "/ui/icons/icon-tasks-active.png" },
-      { id: "workers", label: "Workers", icon: "/ui/icons/icon-workers.png", iconActive: "/ui/icons/icon-workers-active.png" },
+      { id: "workers", label: "Employees", icon: "/ui/icons/icon-workers.png", iconActive: "/ui/icons/icon-workers-active.png" },
     ],
     []
   );
@@ -565,19 +596,27 @@ export default function GameHud() {
             {openPanel === "chat" ? (
               <ChatPanel
                 messages={visibleMessages}
+                tasks={state.tasks}
                 isConnected={state.connection === "connected"}
                 sessions={state.sessions}
                 activeSessionKey={state.activeSessionKey}
               />
             ) : null}
             {openPanel === "tasks" ? <TaskPanel tasks={state.tasks} /> : null}
-            {openPanel === "workers" ? <WorkerPanel seats={state.seats} /> : null}
+            {openPanel === "workers" ? (
+              <WorkerPanel seats={state.seats} onOpenManager={() => setSeatManagerOpen(true)} />
+            ) : null}
           </div>
         ) : null}
         <div style={{ pointerEvents: "auto" }}>
           <HudDock items={dockItems} openPanel={openPanel} onToggle={togglePanel} />
         </div>
       </div>
+      <SeatManagerModal
+        open={seatManagerOpen}
+        onClose={() => setSeatManagerOpen(false)}
+        seats={state.seats}
+      />
     </div>
   );
 }
