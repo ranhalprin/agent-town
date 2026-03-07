@@ -2,12 +2,14 @@
 
 Thanks for your interest in contributing.
 
-This project mixes a React/Next.js application layer with a Phaser-based game simulation layer, so the best contributions are usually small, well-scoped, and easy to verify visually.
+This project combines a React/Next.js app with a Phaser-based simulation layer, so the best contributions are usually small, focused, and easy to verify in the running game.
+
+We also welcome contributors from game design, level design, scene design, and interaction design backgrounds, not just application engineers.
 
 ## Before You Start
 
 - Open an issue or start a discussion for large features, UI overhauls, or architecture changes.
-- Keep pull requests focused. One gameplay/system concern per PR is ideal.
+- Keep pull requests focused. One gameplay or system concern per PR is ideal.
 - If your change affects UX, include screenshots or a short video/GIF in the PR.
 
 ## Development Setup
@@ -38,23 +40,42 @@ pnpm build
 
 ## Project Expectations
 
-When contributing, try to preserve these core product rules:
+When contributing, try to preserve the core shape of the project:
 
-- Tasks should feel **spatial and embodied**, not abstract.
+- Tasks should feel **spatial**, not abstract.
 - Worker behavior should remain **legible to the player**.
 - In-world interactions should take priority over hidden automation.
 - New UI should match the existing **pixel-game HUD style**.
 - Changes should avoid breaking mixed Chinese/English rendering.
+- New scenes should expand the world, not just add another hidden settings surface.
 
 ## Preferred Contribution Areas
 
 - gameplay feel and interaction clarity
+- game design and systems design
+- scene design, level layout, and environmental flow
+- worldbuilding for future spaces such as libraries, workshops, and world-map destinations
 - worker AI and pathing improvements
 - HUD readability and task visibility
 - session UX
 - tool call presentation
 - performance and code quality improvements
 - bug fixes with clear reproduction steps
+
+## Designers Are Welcome
+
+You do not need to contribute only through TypeScript code.
+
+Valuable contributions can also include:
+
+- interaction design proposals
+- scene flow mockups
+- level layout ideas
+- POI placement and pacing suggestions
+- economy and progression ideas for marketplace-style expansion
+- memory / tools / plugin management concepts that can be translated into playable spaces
+
+If you are contributing from a game design, level design, or UX background, feel free to open an issue or draft proposal before implementation details are settled.
 
 ## Pull Request Guidelines
 
