@@ -7,6 +7,7 @@ import { gameEvents } from "@/lib/events";
 export default function TerminalModal() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const [targetSeatId, setTargetSeatId] = useState<string | undefined>(undefined);
   const { state, dispatchTask } = useStudio();
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -14,15 +15,22 @@ export default function TerminalModal() {
 
   const close = useCallback(() => {
     setOpen(false);
+    setTargetSeatId(undefined);
     gameEvents.emit("terminal-closed");
   }, []);
 
   // Listen for scene "open terminal" event
   useEffect(() => {
-    const unsubOpen = gameEvents.on("open-terminal", () => {
+    const openForSeat = (seatId?: unknown) => {
+      setTargetSeatId(typeof seatId === "string" ? seatId : undefined);
       setOpen(true);
-    });
-    return unsubOpen;
+    };
+    const unsubOpen = gameEvents.on("open-terminal", openForSeat);
+    const unsubQueue = gameEvents.on("open-terminal-queue", openForSeat);
+    return () => {
+      unsubOpen();
+      unsubQueue();
+    };
   }, []);
 
   // Focus input when opened
@@ -48,7 +56,7 @@ export default function TerminalModal() {
   const handleSubmit = () => {
     const trimmed = input.trim();
     if (!trimmed || !isConnected) return;
-    dispatchTask(trimmed);
+    dispatchTask(trimmed, targetSeatId);
     setInput("");
     close();
   };

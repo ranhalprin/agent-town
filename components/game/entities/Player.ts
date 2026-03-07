@@ -57,6 +57,11 @@ export class Player {
     }
   }
 
+  isMoving(): boolean {
+    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+    return body.velocity.x !== 0 || body.velocity.y !== 0;
+  }
+
   update() {
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
     const speed = MOVE_SPEED;

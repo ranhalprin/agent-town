@@ -15,6 +15,14 @@ const port = parseInt(process.env.PORT ?? "3000", 10);
 
 const GATEWAY_URL = process.env.GATEWAY_URL ?? "ws://127.0.0.1:18789/";
 
+function isForwardableCloseCode(code: number) {
+  return (
+    code === 1000 ||
+    (code >= 1001 && code <= 1014 && code !== 1004 && code !== 1005 && code !== 1006) ||
+    (code >= 3000 && code <= 4999)
+  );
+}
+
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
@@ -67,7 +75,12 @@ function proxyWebSocket(clientWs: WebSocket) {
 
   upstream.on("close", (code, reason) => {
     if (clientWs.readyState === WebSocket.OPEN) {
-      clientWs.close(code, reason);
+      const textReason = reason.toString();
+      if (isForwardableCloseCode(code)) {
+        clientWs.close(code, textReason);
+      } else {
+        clientWs.close();
+      }
     }
   });
 

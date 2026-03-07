@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import { Player } from "../entities/Player";
-import { Worker } from "../entities/Worker";
+import { Worker, type POI } from "../entities/Worker";
+import { InteractionMenu, type MenuOption } from "../entities/InteractionMenu";
 import {
   SPRITE_KEY,
   SPRITE_PATH,
@@ -10,10 +11,17 @@ import {
   WORKER_SPRITES,
   type Direction,
 } from "../config/animations";
+import {
+  EMOTE_SHEET_KEY,
+  EMOTE_SHEET_PATH,
+  EMOTE_FRAME_SIZE,
+  EMOTE_COLS,
+} from "../config/emotes";
+import { Pathfinder } from "../utils/Pathfinder";
 import { gameEvents } from "@/lib/events";
 
-// Tight interaction radius so terminal only activates at chair notch.
-const INTERACT_DISTANCE = 34;
+const INTERACT_DISTANCE = 48;
+const BOSS_INTERACT_DISTANCE = 34;
 
 interface SeatDef {
   x: number;
@@ -29,10 +37,17 @@ export class OfficeScene extends Phaser.Scene {
   private terminalOpen = false;
   private gameEventUnsubs: Array<() => void> = [];
 
-  /** All worker agents sitting at desks */
   private workers: Worker[] = [];
-  /** runId → Worker mapping for active tasks */
   private runWorkerMap = new Map<string, Worker>();
+  private collisionGroup!: Phaser.Physics.Arcade.StaticGroup;
+  private pathfinder!: Pathfinder;
+  private pois: POI[] = [];
+
+  /** Interaction system */
+  private interactionMenu!: InteractionMenu;
+  private nearestWorker: Worker | null = null;
+  private workerPromptText: Phaser.GameObjects.Text | null = null;
+  private menuOpen = false;
 
   constructor() {
     super({ key: "OfficeScene" });
@@ -47,6 +62,11 @@ export class OfficeScene extends Phaser.Scene {
     for (const ws of WORKER_SPRITES) {
       this.load.image(ws.key, ws.path);
     }
+
+    this.load.spritesheet(EMOTE_SHEET_KEY, EMOTE_SHEET_PATH, {
+      frameWidth: EMOTE_FRAME_SIZE,
+      frameHeight: EMOTE_FRAME_SIZE,
+    });
   }
 
   create() {
@@ -72,32 +92,49 @@ export class OfficeScene extends Phaser.Scene {
     const overheadLayer = map.createLayer("overhead", allTilesets)!;
     overheadLayer.setDepth(10);
 
-    // Collisions
-    const collisionGroup = this.physics.add.staticGroup();
+    this.collisionGroup = this.physics.add.staticGroup();
     const collisionLayer = map.getObjectLayer("collisions");
+    const collisionRects: { x: number; y: number; width: number; height: number }[] = [];
     if (collisionLayer) {
       for (const obj of collisionLayer.objects) {
         const x = obj.x! + obj.width! / 2;
         const y = obj.y! + obj.height! / 2;
-        const rect = collisionGroup.create(x, y, undefined, undefined, false) as Phaser.Physics.Arcade.Sprite;
+        const rect = this.collisionGroup.create(x, y, undefined, undefined, false) as Phaser.Physics.Arcade.Sprite;
         rect.body!.setSize(obj.width!, obj.height!);
         rect.setVisible(false);
         rect.setActive(true);
         (rect.body as Phaser.Physics.Arcade.StaticBody).enable = true;
+
+        collisionRects.push({ x: obj.x!, y: obj.y!, width: obj.width!, height: obj.height! });
       }
     }
 
-    // Read spawn points from Tiled map
+    // Derive room boundaries from collision layer (walls) and block
+    // all exterior area so workers never path outside the room.
+    let wallMinX = Infinity, wallMinY = Infinity, wallMaxX = 0, wallMaxY = 0;
+    for (const r of collisionRects) {
+      wallMinX = Math.min(wallMinX, r.x);
+      wallMinY = Math.min(wallMinY, r.y);
+      wallMaxX = Math.max(wallMaxX, r.x + r.width);
+      wallMaxY = Math.max(wallMaxY, r.y + r.height);
+    }
+    const mapW = map.widthInPixels;
+    const mapH = map.heightInPixels;
+    if (wallMinX > 0)    collisionRects.push({ x: 0, y: 0, width: wallMinX, height: mapH });
+    if (wallMinY > 0)    collisionRects.push({ x: 0, y: 0, width: mapW, height: wallMinY });
+    if (wallMaxX < mapW)  collisionRects.push({ x: wallMaxX, y: 0, width: mapW - wallMaxX, height: mapH });
+    if (wallMaxY < mapH)  collisionRects.push({ x: 0, y: wallMaxY, width: mapW, height: mapH - wallMaxY });
+
+    this.pathfinder = new Pathfinder(map.widthInPixels, map.heightInPixels, collisionRects, 8);
+
     const { bossSpawn, workerSpawns } = this.parseSpawns(map);
 
-    // Player (boss)
     this.player = new Player(this, bossSpawn.x, bossSpawn.y);
-    this.physics.add.collider(this.player.sprite, collisionGroup);
+    this.physics.add.collider(this.player.sprite, this.collisionGroup);
 
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     this.player.sprite.setCollideWorldBounds(true);
 
-    // Camera
     const cam = this.cameras.main;
     cam.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     cam.setBackgroundColor("#1a1a2e");
@@ -107,24 +144,63 @@ export class OfficeScene extends Phaser.Scene {
       "wheel",
       (_p: Phaser.Input.Pointer, _gx: number[], _gy: number, _gz: number, dy: number) => {
         cam.setZoom(Phaser.Math.Clamp(cam.zoom - dy * 0.001, 0.5, 2));
-      }
+      },
     );
 
-    // Boss seat terminal interaction (near boss spawn)
+    this.initCameraDrag(cam);
+
+    this.parsePOIs(map);
     this.initBossSeat(bossSpawn);
-
-    // Worker seats (from spawn points)
     this.initWorkers(workerSpawns);
-
-    // Game events
+    this.initInteractionUI();
     this.initGameEvents();
 
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.cleanupGameEvents();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanupGameEvents());
+    this.events.once(Phaser.Scenes.Events.DESTROY, () => this.cleanupGameEvents());
+  }
+
+  // ── Camera drag ─────────────────────────────────────────
+
+  private cameraDragging = false;
+  private cameraFollowing = true;
+
+  private initCameraDrag(cam: Phaser.Cameras.Scene2D.Camera) {
+    let dragStartX = 0;
+    let dragStartY = 0;
+
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      if (pointer.leftButtonDown()) {
+        this.cameraDragging = true;
+        dragStartX = pointer.worldX;
+        dragStartY = pointer.worldY;
+      }
     });
-    this.events.once(Phaser.Scenes.Events.DESTROY, () => {
-      this.cleanupGameEvents();
+
+    this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
+      if (!this.cameraDragging || !pointer.leftButtonDown()) return;
+
+      const dx = dragStartX - pointer.worldX;
+      const dy = dragStartY - pointer.worldY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        if (this.cameraFollowing) {
+          cam.stopFollow();
+          this.cameraFollowing = false;
+        }
+        cam.scrollX += dx;
+        cam.scrollY += dy;
+      }
     });
+
+    this.input.on("pointerup", () => {
+      this.cameraDragging = false;
+    });
+  }
+
+  private resumeCameraFollow() {
+    if (!this.cameraFollowing) {
+      this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
+      this.cameraFollowing = true;
+    }
   }
 
   // ── Spawns ───────────────────────────────────────────────
@@ -143,7 +219,6 @@ export class OfficeScene extends Phaser.Scene {
       return (fp?.value as Direction) ?? "down";
     };
 
-    // Boss = object named "boss"; fallback to rightmost
     let bossObj = spawnsLayer.objects.find((o) => o.name === "boss");
     if (!bossObj) {
       const sorted = [...spawnsLayer.objects].sort((a, b) => a.x! - b.x!);
@@ -163,6 +238,19 @@ export class OfficeScene extends Phaser.Scene {
     return { bossSpawn, workerSpawns };
   }
 
+  // ── Points of Interest ────────────────────────────────────
+
+  private parsePOIs(map: Phaser.Tilemaps.Tilemap) {
+    const layer = map.getObjectLayer("pois");
+    if (!layer) return;
+
+    for (const obj of layer.objects) {
+      if (obj.name && typeof obj.x === "number" && typeof obj.y === "number") {
+        this.pois.push({ name: obj.name, x: obj.x, y: obj.y });
+      }
+    }
+  }
+
   // ── Workers ──────────────────────────────────────────────
 
   private initWorkers(seats: SeatDef[]) {
@@ -172,27 +260,116 @@ export class OfficeScene extends Phaser.Scene {
       const seat = seats[i];
       const cfg = available[i];
       const facing: Direction = cfg.label === "Eve" ? "right" : seat.facing;
-      const worker = new Worker(
-        this,
-        seat.x,
-        seat.y,
-        cfg.key,
-        `seat-${i}`,
-        cfg.label,
-        facing,
-      );
+      const worker = new Worker(this, seat.x, seat.y, cfg.key, `seat-${i}`, cfg.label, facing);
+      worker.setPOIs(this.pois);
+      worker.setPathfinder(this.pathfinder);
       this.workers.push(worker);
+
+      worker.sprite.setCollideWorldBounds(true);
     }
   }
 
-  // ── Game events bridge (React store → Phaser) ──────────
+  // ── Interaction UI ───────────────────────────────────────
+
+  private initInteractionUI() {
+    this.workerPromptText = this.add
+      .text(0, 0, "Press E", {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: "8px",
+        color: "#facc15",
+        backgroundColor: "rgba(0,0,0,0.8)",
+        padding: { x: 6, y: 4 },
+        align: "center",
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(25)
+      .setVisible(false);
+
+    this.interactionMenu = new InteractionMenu(this);
+    this.interactionMenu.onClose = () => {
+      this.menuOpen = false;
+    };
+  }
+
+  private findNearestWorker(): Worker | null {
+    let nearest: Worker | null = null;
+    let minDist = Infinity;
+
+    for (const worker of this.workers) {
+      const dist = Phaser.Math.Distance.Between(
+        this.player.sprite.x, this.player.sprite.y,
+        worker.sprite.x, worker.sprite.y,
+      );
+      if (dist < INTERACT_DISTANCE && dist < minDist) {
+        minDist = dist;
+        nearest = worker;
+      }
+    }
+    return nearest;
+  }
+
+  private openWorkerMenu(worker: Worker) {
+    this.menuOpen = true;
+
+    const isWorking = worker.status === "working";
+    const isIdle = worker.status === "idle" || worker.status === "done";
+
+    const options: MenuOption[] = [
+      {
+        label: "Dispatch Task",
+        enabled: true,
+        action: () => {
+          this.menuOpen = false;
+          if (isIdle) {
+            gameEvents.emit("open-terminal", worker.seatId);
+          } else {
+            gameEvents.emit("open-terminal-queue", worker.seatId);
+          }
+        },
+      },
+      {
+        label: "Stop Task",
+        enabled: isWorking,
+        action: () => {
+          this.menuOpen = false;
+          if (worker.assignedRunId) {
+            gameEvents.emit("stop-task", worker.assignedRunId, worker.seatId);
+          }
+        },
+      },
+      {
+        label: "Cancel",
+        enabled: true,
+        action: () => {
+          this.menuOpen = false;
+        },
+      },
+    ];
+
+    if (worker.taskQueue.length > 0) {
+      options.splice(2, 0, {
+        label: `Queue (${worker.taskQueue.length})`,
+        enabled: false,
+        action: () => {},
+      });
+    }
+
+    this.interactionMenu.show(worker.sprite.x, worker.sprite.y, options);
+  }
+
+  // ── Game events bridge ─────────────────────────────────
 
   private initGameEvents() {
     this.cleanupGameEvents();
 
-    this.gameEventUnsubs.push(gameEvents.on("task-assigned", (runId: unknown, message: unknown) => {
-      const worker = this.findIdleWorker();
+    this.gameEventUnsubs.push(gameEvents.on("task-assigned", (runId: unknown, message: unknown, seatId: unknown) => {
+      const targetSeatId = typeof seatId === "string" ? seatId : undefined;
+      const worker = this.findWorkerBySeatId(targetSeatId) ?? this.findIdleWorker();
       if (!worker) return;
+      if (targetSeatId && worker.status === "working" && worker.assignedRunId) {
+        worker.enqueueTask(runId as string, message as string);
+        return;
+      }
       worker.assignTask(runId as string, message as string);
       this.runWorkerMap.set(runId as string, worker);
     }));
@@ -218,7 +395,7 @@ export class OfficeScene extends Phaser.Scene {
       }
     }));
 
-    this.gameEventUnsubs.push(gameEvents.on("subagent-assigned", (runId: unknown, parentRunId: unknown, label: unknown) => {
+    this.gameEventUnsubs.push(gameEvents.on("subagent-assigned", (runId: unknown, _parentRunId: unknown, label: unknown) => {
       const worker = this.findIdleWorker();
       if (!worker) return;
       worker.assignTask(runId as string, `[Sub] ${label as string}`);
@@ -231,16 +408,17 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   private cleanupGameEvents() {
-    for (const unsub of this.gameEventUnsubs) {
-      unsub();
-    }
+    for (const unsub of this.gameEventUnsubs) unsub();
     this.gameEventUnsubs = [];
   }
 
+  private findWorkerBySeatId(seatId?: string): Worker | null {
+    if (!seatId) return null;
+    return this.workers.find((worker) => worker.seatId === seatId) ?? null;
+  }
+
   private findIdleWorker(): Worker | null {
-    const idle = this.workers.filter((w) => w.status === "idle");
-    if (idle.length === 0) return null;
-    return idle[Math.floor(Math.random() * idle.length)];
+    return this.workers.find((worker) => worker.status === "idle") ?? null;
   }
 
   // ── Boss seat ──────────────────────────────────────────
@@ -257,7 +435,7 @@ export class OfficeScene extends Phaser.Scene {
         padding: { x: 6, y: 4 },
         align: "center",
       })
-      .setOrigin(0, 0.5)
+      .setOrigin(0, 0)
       .setDepth(20)
       .setVisible(false);
 
@@ -277,7 +455,7 @@ export class OfficeScene extends Phaser.Scene {
           col * FRAME_WIDTH,
           row * FRAME_HEIGHT,
           FRAME_WIDTH,
-          FRAME_HEIGHT
+          FRAME_HEIGHT,
         );
       }
     }
@@ -287,7 +465,7 @@ export class OfficeScene extends Phaser.Scene {
     map: Phaser.Tilemaps.Tilemap,
     layerName: string,
     tilesets: Phaser.Tilemaps.Tileset[],
-    depth: number
+    depth: number,
   ) {
     const objectLayer = map.getObjectLayer(layerName);
     if (!objectLayer) return;
@@ -305,11 +483,10 @@ export class OfficeScene extends Phaser.Scene {
       if (!tileset) continue;
 
       const localId = obj.gid - tileset.firstgid;
-      const cols = tileset.columns;
       const tileW = tileset.tileWidth;
       const tileH = tileset.tileHeight;
-      const srcX = (localId % cols) * tileW;
-      const srcY = Math.floor(localId / cols) * tileH;
+      const srcX = (localId % tileset.columns) * tileW;
+      const srcY = Math.floor(localId / tileset.columns) * tileH;
 
       const frameKey = `${tileset.name}_${localId}`;
       if (!this.textures.exists(frameKey)) {
@@ -327,18 +504,59 @@ export class OfficeScene extends Phaser.Scene {
   // ── Update ─────────────────────────────────────────────
 
   update() {
-    if (this.terminalOpen) return;
+    // Update interaction menu even when it's open
+    if (this.interactionMenu.visible) {
+      this.interactionMenu.update();
+      for (const worker of this.workers) worker.update();
+      return;
+    }
+
+    if (this.terminalOpen) {
+      for (const worker of this.workers) worker.update();
+      return;
+    }
 
     this.player.update();
+    if (!this.cameraFollowing && this.player.isMoving()) {
+      this.resumeCameraFollow();
+    }
+    for (const worker of this.workers) worker.update();
 
-    if (this.terminalZone && this.promptText) {
+    // Worker proximity detection
+    const nearest = this.findNearestWorker();
+
+    if (nearest !== this.nearestWorker) {
+      if (this.nearestWorker) this.nearestWorker.resume();
+      this.nearestWorker = nearest;
+    }
+
+    if (this.workerPromptText) {
+      if (nearest) {
+        nearest.pause();
+        this.workerPromptText.setPosition(
+          nearest.sprite.x,
+          nearest.sprite.y - FRAME_HEIGHT * 0.5,
+        );
+        this.workerPromptText.setVisible(true);
+      } else {
+        this.workerPromptText.setVisible(false);
+      }
+    }
+
+    // E key: worker menu takes priority over boss terminal
+    if (nearest && Phaser.Input.Keyboard.JustDown(this.eKey)) {
+      this.openWorkerMenu(nearest);
+      if (this.workerPromptText) this.workerPromptText.setVisible(false);
+      return;
+    }
+
+    // Boss terminal interaction (only when no worker is nearby)
+    if (!nearest && this.terminalZone && this.promptText) {
       const dist = Phaser.Math.Distance.Between(
-        this.player.sprite.x,
-        this.player.sprite.y,
-        this.terminalZone.x,
-        this.terminalZone.y
+        this.player.sprite.x, this.player.sprite.y,
+        this.terminalZone.x, this.terminalZone.y,
       );
-      const near = dist < INTERACT_DISTANCE;
+      const near = dist < BOSS_INTERACT_DISTANCE;
       this.promptText.setVisible(near);
 
       if (near && Phaser.Input.Keyboard.JustDown(this.eKey)) {
@@ -346,6 +564,8 @@ export class OfficeScene extends Phaser.Scene {
         this.promptText.setVisible(false);
         gameEvents.emit("open-terminal");
       }
+    } else if (this.promptText) {
+      this.promptText.setVisible(false);
     }
   }
 }

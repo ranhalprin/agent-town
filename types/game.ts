@@ -61,9 +61,29 @@ export interface GatewayConfig {
   token: string;
 }
 
+export interface SessionMetrics {
+  usedTokens?: number;
+  maxContextTokens?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  fresh: boolean;
+  model?: string;
+  provider?: string;
+  updatedAt?: string;
+}
+
+export interface SessionRecord {
+  key: string;
+  label?: string;
+  createdAt: string;
+}
+
 export interface StudioSnapshot {
   connection: ConnectionStatus;
   seats: SeatState[];
   tasks: TaskItem[];
   chatMessages: ChatMessage[];
+  activeSessionKey?: string;
+  sessionMetrics: SessionMetrics;
+  sessions: SessionRecord[];
 }
