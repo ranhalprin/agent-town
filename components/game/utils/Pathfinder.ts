@@ -1,3 +1,5 @@
+import { PF_CELL_SIZE, PF_MAX_ITER } from "@/lib/constants";
+
 export interface PathPoint {
   x: number;
   y: number;
@@ -11,7 +13,52 @@ interface AStarNode {
   parent: AStarNode | null;
 }
 
-const CELL_SIZE = 16;
+const CELL_SIZE = PF_CELL_SIZE;
+
+class MinHeap<T> {
+  private data: T[] = [];
+  constructor(private score: (item: T) => number) {}
+
+  get length() { return this.data.length; }
+
+  push(item: T) {
+    this.data.push(item);
+    this.bubbleUp(this.data.length - 1);
+  }
+
+  pop(): T | undefined {
+    const top = this.data[0];
+    const last = this.data.pop();
+    if (this.data.length > 0 && last !== undefined) {
+      this.data[0] = last;
+      this.sinkDown(0);
+    }
+    return top;
+  }
+
+  private bubbleUp(i: number) {
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (this.score(this.data[i]) >= this.score(this.data[parent])) break;
+      [this.data[i], this.data[parent]] = [this.data[parent], this.data[i]];
+      i = parent;
+    }
+  }
+
+  private sinkDown(i: number) {
+    const n = this.data.length;
+    while (true) {
+      let smallest = i;
+      const l = 2 * i + 1;
+      const r = 2 * i + 2;
+      if (l < n && this.score(this.data[l]) < this.score(this.data[smallest])) smallest = l;
+      if (r < n && this.score(this.data[r]) < this.score(this.data[smallest])) smallest = r;
+      if (smallest === i) break;
+      [this.data[i], this.data[smallest]] = [this.data[smallest], this.data[i]];
+      i = smallest;
+    }
+  }
+}
 
 export class Pathfinder {
   private grid: boolean[][];
@@ -96,7 +143,8 @@ export class Pathfinder {
       return [{ x: sx, y: sy }, { x: ex, y: ey }];
     }
 
-    const open: AStarNode[] = [{ r: sr, c: sc, g: 0, h: this.h(sr, sc, er, ec), parent: null }];
+    const open = new MinHeap<AStarNode>((n) => n.g + n.h);
+    open.push({ r: sr, c: sc, g: 0, h: this.h(sr, sc, er, ec), parent: null });
     const best = new Map<number, number>();
     const DIRS: [number, number][] = [
       [-1, 0], [1, 0], [0, -1], [0, 1],
@@ -104,15 +152,9 @@ export class Pathfinder {
     ];
 
     let iterations = 0;
-    const MAX_ITER = 5000;
 
-    while (open.length > 0 && iterations++ < MAX_ITER) {
-      let bi = 0;
-      for (let i = 1; i < open.length; i++) {
-        if (open[i].g + open[i].h < open[bi].g + open[bi].h) bi = i;
-      }
-      const cur = open[bi];
-      open.splice(bi, 1);
+    while (open.length > 0 && iterations++ < PF_MAX_ITER) {
+      const cur = open.pop()!;
 
       if (cur.r === er && cur.c === ec) {
         return this.reconstruct(cur);

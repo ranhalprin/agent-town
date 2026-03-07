@@ -2,9 +2,10 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Force a fresh font family + fresh filename to bypass cache/config issues. */
 @font-face {
-  font-family: "Zpix";
-  src: url("/fonts/zpix.woff2") format("woff2");
+  font-family: "Zpix20260307";
+  src: url("/fonts/zpix-20260307.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -145,7 +146,8 @@
   --pixel-red: #ef4444;
   --pixel-text: #e2e8f0;
   --pixel-muted: #94a3b8;
-  --pixel-font: var(--font-pixel), "Press Start 2P", "Zpix", monospace;
+  --pixel-font: var(--font-pixel), "Zpix20260307", monospace;
+  --pixel-font-chat: "Zpix20260307", monospace;
 }
 
 img,
@@ -193,8 +195,8 @@ canvas {
 }
 
 .pixel-input {
-  font-family: var(--pixel-font);
-  font-size: 10px;
+  font-family: "Zpix20260307", monospace;
+  font-size: 12px;
   padding: 8px 12px;
   border: 3px solid var(--pixel-border);
   background: #0d1b2a;
@@ -202,6 +204,16 @@ canvas {
   resize: vertical;
   width: 100%;
   min-height: 60px;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
+}
+
+.pixel-input::placeholder {
+  font-family: "Zpix20260307", monospace;
+  font-size: 12px;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
 }
 
 .pixel-input:focus {
@@ -518,11 +530,15 @@ canvas {
 .hud-chat__tool,
 .hud-chat__system {
   border: 2px solid rgba(255,255,255,0.08);
-  padding: 8px;
-  font-size: 8px;
-  line-height: 1.7;
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.85;
   white-space: pre-wrap;
   word-break: break-word;
+  font-family: "Zpix20260307", monospace;
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
 }
 
 .hud-chat__bubble--user {
@@ -536,8 +552,11 @@ canvas {
 
 .hud-chat__role,
 .hud-chat__tool-name {
-  margin-bottom: 4px;
+  margin-bottom: 8px;
   color: #ffe1ae;
+  font-family: var(--pixel-font);
+  font-size: 10px;
+  line-height: 1.4;
 }
 
 .hud-chat__tool {
@@ -546,8 +565,11 @@ canvas {
 }
 
 .hud-chat__tool-output {
-  margin-top: 4px;
+  margin-top: 8px;
   color: var(--pixel-green);
+  font-family: "Zpix20260307", monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
 }
 
 .hud-chat__system {
@@ -622,7 +644,7 @@ canvas {
 .hud-empty {
   padding: 20px 8px;
   text-align: center;
-  font-size: 8px;
+  font-size: 10px;
   color: var(--pixel-muted);
 }
 

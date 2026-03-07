@@ -1,13 +1,11 @@
 import * as Phaser from "phaser";
 import { Player } from "../entities/Player";
-import { Worker, type POI } from "../entities/Worker";
+import { Worker, resetWanderClock, type POI } from "../entities/Worker";
 import { InteractionMenu, type MenuOption } from "../entities/InteractionMenu";
 import {
   SPRITE_KEY,
   SPRITE_PATH,
-  FRAME_WIDTH,
   FRAME_HEIGHT,
-  SHEET_COLUMNS,
   WORKER_SPRITES,
   type Direction,
 } from "../config/animations";
@@ -15,21 +13,32 @@ import {
   EMOTE_SHEET_KEY,
   EMOTE_SHEET_PATH,
   EMOTE_FRAME_SIZE,
-  EMOTE_COLS,
 } from "../config/emotes";
 import { Pathfinder } from "../utils/Pathfinder";
+import {
+  buildSpriteFrames,
+  parseSpawns,
+  parsePOIs,
+  buildCollisionRects,
+  renderTileObjectLayer,
+  type SeatDef,
+} from "../utils/MapHelpers";
 import { gameEvents } from "@/lib/events";
+import {
+  INTERACT_DISTANCE,
+  BOSS_INTERACT_DISTANCE,
+  PF_PADDING,
+  PRESS_E_STYLE,
+  BOSS_PROMPT_OFFSET_X,
+  BOSS_PROMPT_OFFSET_Y,
+  CAMERA_LERP,
+  ZOOM_SENSITIVITY,
+  ZOOM_MIN,
+  ZOOM_MAX,
+  CAMERA_DRAG_THRESHOLD,
+  PROMPT_Y_OFFSET,
+} from "@/lib/constants";
 import type { SeatState } from "@/types/game";
-
-const INTERACT_DISTANCE = 48;
-const BOSS_INTERACT_DISTANCE = 34;
-
-interface SeatDef {
-  seatId: string;
-  x: number;
-  y: number;
-  facing: Direction;
-}
 
 export class OfficeScene extends Phaser.Scene {
   private player!: Player;
@@ -73,9 +82,9 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   create() {
-    this.buildSpriteFrames(SPRITE_KEY);
+    buildSpriteFrames(this, SPRITE_KEY);
     for (const ws of WORKER_SPRITES) {
-      this.buildSpriteFrames(ws.key);
+      buildSpriteFrames(this, ws.key);
     }
 
     const map = this.make.tilemap({ key: "office" });
@@ -90,47 +99,17 @@ export class OfficeScene extends Phaser.Scene {
     map.createLayer("furniture", allTilesets)!;
     map.createLayer("objects", allTilesets)!;
 
-    this.renderTileObjectLayer(map, "desktop", allTilesets, 5);
+    renderTileObjectLayer(this, map, "desktop", allTilesets, 5);
 
     const overheadLayer = map.createLayer("overhead", allTilesets)!;
     overheadLayer.setDepth(10);
 
     this.collisionGroup = this.physics.add.staticGroup();
-    const collisionLayer = map.getObjectLayer("collisions");
-    const collisionRects: { x: number; y: number; width: number; height: number }[] = [];
-    if (collisionLayer) {
-      for (const obj of collisionLayer.objects) {
-        const x = obj.x! + obj.width! / 2;
-        const y = obj.y! + obj.height! / 2;
-        const rect = this.collisionGroup.create(x, y, undefined, undefined, false) as Phaser.Physics.Arcade.Sprite;
-        rect.body!.setSize(obj.width!, obj.height!);
-        rect.setVisible(false);
-        rect.setActive(true);
-        (rect.body as Phaser.Physics.Arcade.StaticBody).enable = true;
+    const collisionRects = buildCollisionRects(map, this.collisionGroup);
 
-        collisionRects.push({ x: obj.x!, y: obj.y!, width: obj.width!, height: obj.height! });
-      }
-    }
+    this.pathfinder = new Pathfinder(map.widthInPixels, map.heightInPixels, collisionRects, PF_PADDING);
 
-    // Derive room boundaries from collision layer (walls) and block
-    // all exterior area so workers never path outside the room.
-    let wallMinX = Infinity, wallMinY = Infinity, wallMaxX = 0, wallMaxY = 0;
-    for (const r of collisionRects) {
-      wallMinX = Math.min(wallMinX, r.x);
-      wallMinY = Math.min(wallMinY, r.y);
-      wallMaxX = Math.max(wallMaxX, r.x + r.width);
-      wallMaxY = Math.max(wallMaxY, r.y + r.height);
-    }
-    const mapW = map.widthInPixels;
-    const mapH = map.heightInPixels;
-    if (wallMinX > 0)    collisionRects.push({ x: 0, y: 0, width: wallMinX, height: mapH });
-    if (wallMinY > 0)    collisionRects.push({ x: 0, y: 0, width: mapW, height: wallMinY });
-    if (wallMaxX < mapW)  collisionRects.push({ x: wallMaxX, y: 0, width: mapW - wallMaxX, height: mapH });
-    if (wallMaxY < mapH)  collisionRects.push({ x: 0, y: wallMaxY, width: mapW, height: mapH - wallMaxY });
-
-    this.pathfinder = new Pathfinder(map.widthInPixels, map.heightInPixels, collisionRects, 8);
-
-    const { bossSpawn, workerSpawns } = this.parseSpawns(map);
+    const { bossSpawn, workerSpawns } = parseSpawns(map);
     this.seatDefs = workerSpawns;
 
     this.player = new Player(this, bossSpawn.x, bossSpawn.y);
@@ -142,25 +121,26 @@ export class OfficeScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     cam.setBackgroundColor("#1a1a2e");
-    cam.startFollow(this.player.sprite, true, 0.1, 0.1);
+    cam.startFollow(this.player.sprite, true, CAMERA_LERP, CAMERA_LERP);
 
     this.input.on(
       "wheel",
       (_p: Phaser.Input.Pointer, _gx: number[], _gy: number, _gz: number, dy: number) => {
-        cam.setZoom(Phaser.Math.Clamp(cam.zoom - dy * 0.001, 0.5, 2));
+        cam.setZoom(Phaser.Math.Clamp(cam.zoom - dy * ZOOM_SENSITIVITY, ZOOM_MIN, ZOOM_MAX));
       },
     );
 
     this.initCameraDrag(cam);
 
-    this.parsePOIs(map);
+    this.pois = parsePOIs(map);
+    resetWanderClock();
     this.initBossSeat(bossSpawn);
     this.initInteractionUI();
     this.initGameEvents();
     gameEvents.emit("seats-discovered", workerSpawns);
 
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanupGameEvents());
-    this.events.once(Phaser.Scenes.Events.DESTROY, () => this.cleanupGameEvents());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup());
+    this.events.once(Phaser.Scenes.Events.DESTROY, () => this.cleanup());
   }
 
   // ── Camera drag ─────────────────────────────────────────
@@ -185,7 +165,7 @@ export class OfficeScene extends Phaser.Scene {
 
       const dx = dragStartX - pointer.worldX;
       const dy = dragStartY - pointer.worldY;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      if (Math.abs(dx) > CAMERA_DRAG_THRESHOLD || Math.abs(dy) > CAMERA_DRAG_THRESHOLD) {
         if (this.cameraFollowing) {
           cam.stopFollow();
           this.cameraFollowing = false;
@@ -202,57 +182,8 @@ export class OfficeScene extends Phaser.Scene {
 
   private resumeCameraFollow() {
     if (!this.cameraFollowing) {
-      this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
+      this.cameras.main.startFollow(this.player.sprite, true, CAMERA_LERP, CAMERA_LERP);
       this.cameraFollowing = true;
-    }
-  }
-
-  // ── Spawns ───────────────────────────────────────────────
-
-  private parseSpawns(map: Phaser.Tilemaps.Tilemap) {
-    const spawnsLayer = map.getObjectLayer("spawns");
-    const fallback = { x: map.widthInPixels / 2, y: map.heightInPixels / 2 };
-
-    if (!spawnsLayer || spawnsLayer.objects.length === 0) {
-      return { bossSpawn: fallback, workerSpawns: [] as SeatDef[] };
-    }
-
-    const getFacing = (obj: Phaser.Types.Tilemaps.TiledObject): Direction => {
-      const props = obj.properties as Array<{ name: string; value: string }> | undefined;
-      const fp = props?.find((p) => p.name === "facing");
-      return (fp?.value as Direction) ?? "down";
-    };
-
-    let bossObj = spawnsLayer.objects.find((o) => o.name === "boss");
-    if (!bossObj) {
-      const sorted = [...spawnsLayer.objects].sort((a, b) => a.x! - b.x!);
-      bossObj = sorted.pop()!;
-    }
-
-    const bossSpawn = { x: bossObj.x!, y: bossObj.y! };
-
-    const workerSpawns: SeatDef[] = spawnsLayer.objects
-      .filter((obj) => obj !== bossObj)
-      .map((obj, index) => ({
-        seatId: obj.name && obj.name !== "boss" ? obj.name : `seat-${index}`,
-        x: obj.x!,
-        y: obj.y!,
-        facing: getFacing(obj),
-      }));
-
-    return { bossSpawn, workerSpawns };
-  }
-
-  // ── Points of Interest ────────────────────────────────────
-
-  private parsePOIs(map: Phaser.Tilemaps.Tilemap) {
-    const layer = map.getObjectLayer("pois");
-    if (!layer) return;
-
-    for (const obj of layer.objects) {
-      if (obj.name && typeof obj.x === "number" && typeof obj.y === "number") {
-        this.pois.push({ name: obj.name, x: obj.x, y: obj.y });
-      }
     }
   }
 
@@ -333,14 +264,7 @@ export class OfficeScene extends Phaser.Scene {
 
   private initInteractionUI() {
     this.workerPromptText = this.add
-      .text(0, 0, "Press E", {
-        fontFamily: '"Press Start 2P", monospace',
-        fontSize: "8px",
-        color: "#facc15",
-        backgroundColor: "rgba(0,0,0,0.8)",
-        padding: { x: 6, y: 4 },
-        align: "center",
-      })
+      .text(0, 0, "Press E", PRESS_E_STYLE as Phaser.Types.GameObjects.Text.TextStyle)
       .setOrigin(0.5, 1)
       .setDepth(25)
       .setVisible(false);
@@ -420,51 +344,50 @@ export class OfficeScene extends Phaser.Scene {
   // ── Game events bridge ─────────────────────────────────
 
   private initGameEvents() {
-    this.cleanupGameEvents();
+    for (const unsub of this.gameEventUnsubs) unsub();
+    this.gameEventUnsubs = [];
 
-    this.gameEventUnsubs.push(gameEvents.on("seat-configs-updated", (seats: unknown) => {
-      if (!Array.isArray(seats)) return;
-      this.syncWorkers(seats as SeatState[]);
+    this.gameEventUnsubs.push(gameEvents.on("seat-configs-updated", (seats) => {
+      this.syncWorkers(seats);
     }));
 
-    this.gameEventUnsubs.push(gameEvents.on("task-assigned", (runId: unknown, message: unknown, seatId: unknown) => {
-      const targetSeatId = typeof seatId === "string" ? seatId : undefined;
-      const worker = this.findWorkerBySeatId(targetSeatId) ?? this.findIdleWorker();
+    this.gameEventUnsubs.push(gameEvents.on("task-assigned", (runId, message, seatId) => {
+      const worker = this.findWorkerBySeatId(seatId) ?? this.findIdleWorker();
       if (!worker) return;
-      if (targetSeatId && worker.status === "working" && worker.assignedRunId) {
-        worker.enqueueTask(runId as string, message as string);
+      if (seatId && worker.status === "working" && worker.assignedRunId) {
+        worker.enqueueTask(runId, message);
         return;
       }
-      worker.assignTask(runId as string, message as string);
-      this.runWorkerMap.set(runId as string, worker);
+      worker.assignTask(runId, message);
+      this.runWorkerMap.set(runId, worker);
     }));
 
-    this.gameEventUnsubs.push(gameEvents.on("task-bubble", (runId: unknown, text: unknown, ttl: unknown) => {
-      const worker = this.runWorkerMap.get(runId as string);
-      if (worker) worker.showBubble(text as string, (ttl as number) ?? 5000);
+    this.gameEventUnsubs.push(gameEvents.on("task-bubble", (runId, text, ttl) => {
+      const worker = this.runWorkerMap.get(runId);
+      if (worker) worker.showBubble(text, ttl ?? 5000);
     }));
 
-    this.gameEventUnsubs.push(gameEvents.on("task-completed", (runId: unknown) => {
-      const worker = this.runWorkerMap.get(runId as string);
+    this.gameEventUnsubs.push(gameEvents.on("task-completed", (runId) => {
+      const worker = this.runWorkerMap.get(runId);
       if (worker) {
         worker.completeTask();
-        this.runWorkerMap.delete(runId as string);
+        this.runWorkerMap.delete(runId);
       }
     }));
 
-    this.gameEventUnsubs.push(gameEvents.on("task-failed", (runId: unknown) => {
-      const worker = this.runWorkerMap.get(runId as string);
+    this.gameEventUnsubs.push(gameEvents.on("task-failed", (runId) => {
+      const worker = this.runWorkerMap.get(runId);
       if (worker) {
         worker.failTask();
-        this.runWorkerMap.delete(runId as string);
+        this.runWorkerMap.delete(runId);
       }
     }));
 
-    this.gameEventUnsubs.push(gameEvents.on("subagent-assigned", (runId: unknown, _parentRunId: unknown, label: unknown) => {
+    this.gameEventUnsubs.push(gameEvents.on("subagent-assigned", (runId, _parentRunId, label) => {
       const worker = this.findIdleWorker();
       if (!worker) return;
-      worker.assignTask(runId as string, `[Sub] ${label as string}`);
-      this.runWorkerMap.set(runId as string, worker);
+      worker.assignTask(runId, `[Sub] ${label}`);
+      this.runWorkerMap.set(runId, worker);
     }));
 
     this.gameEventUnsubs.push(gameEvents.on("terminal-closed", () => {
@@ -472,9 +395,16 @@ export class OfficeScene extends Phaser.Scene {
     }));
   }
 
-  private cleanupGameEvents() {
+  private cleanup() {
     for (const unsub of this.gameEventUnsubs) unsub();
     this.gameEventUnsubs = [];
+
+    for (const worker of this.workers) worker.destroy();
+    this.workers = [];
+    this.runWorkerMap.clear();
+    this.nearestWorker = null;
+
+    this.interactionMenu?.destroy();
   }
 
   private findWorkerBySeatId(seatId?: string): Worker | null {
@@ -492,78 +422,12 @@ export class OfficeScene extends Phaser.Scene {
     this.terminalZone = { x: bossSpawn.x, y: bossSpawn.y };
 
     this.promptText = this.add
-      .text(bossSpawn.x + 40, bossSpawn.y - 16, "Press E", {
-        fontFamily: '"Press Start 2P", monospace',
-        fontSize: "8px",
-        color: "#facc15",
-        backgroundColor: "rgba(0,0,0,0.8)",
-        padding: { x: 6, y: 4 },
-        align: "center",
-      })
+      .text(bossSpawn.x + BOSS_PROMPT_OFFSET_X, bossSpawn.y - BOSS_PROMPT_OFFSET_Y, "Press E", PRESS_E_STYLE as Phaser.Types.GameObjects.Text.TextStyle)
       .setOrigin(0, 0)
       .setDepth(20)
       .setVisible(false);
 
     this.eKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
-  }
-
-  // ── Tile object layer rendering ────────────────────────
-
-  private buildSpriteFrames(key: string) {
-    const tex = this.textures.get(key);
-    const rows = Math.floor(tex.source[0].height / FRAME_HEIGHT);
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < SHEET_COLUMNS; col++) {
-        tex.add(
-          row * SHEET_COLUMNS + col,
-          0,
-          col * FRAME_WIDTH,
-          row * FRAME_HEIGHT,
-          FRAME_WIDTH,
-          FRAME_HEIGHT,
-        );
-      }
-    }
-  }
-
-  private renderTileObjectLayer(
-    map: Phaser.Tilemaps.Tilemap,
-    layerName: string,
-    tilesets: Phaser.Tilemaps.Tileset[],
-    depth: number,
-  ) {
-    const objectLayer = map.getObjectLayer(layerName);
-    if (!objectLayer) return;
-
-    for (const obj of objectLayer.objects) {
-      if (!obj.gid) continue;
-
-      let tileset: Phaser.Tilemaps.Tileset | null = null;
-      for (let i = tilesets.length - 1; i >= 0; i--) {
-        if (obj.gid >= tilesets[i].firstgid) {
-          tileset = tilesets[i];
-          break;
-        }
-      }
-      if (!tileset) continue;
-
-      const localId = obj.gid - tileset.firstgid;
-      const tileW = tileset.tileWidth;
-      const tileH = tileset.tileHeight;
-      const srcX = (localId % tileset.columns) * tileW;
-      const srcY = Math.floor(localId / tileset.columns) * tileH;
-
-      const frameKey = `${tileset.name}_${localId}`;
-      if (!this.textures.exists(frameKey)) {
-        const baseTexture = this.textures.get(tileset.name);
-        baseTexture.add(localId, 0, srcX, srcY, tileW, tileH);
-      }
-
-      this.add
-        .image(obj.x!, obj.y! - tileH, tileset.name, localId)
-        .setOrigin(0, 0)
-        .setDepth(depth);
-    }
   }
 
   // ── Update ─────────────────────────────────────────────
@@ -600,7 +464,7 @@ export class OfficeScene extends Phaser.Scene {
         nearest.pause();
         this.workerPromptText.setPosition(
           nearest.sprite.x,
-          nearest.sprite.y - FRAME_HEIGHT * 0.5,
+          nearest.sprite.y - FRAME_HEIGHT * PROMPT_Y_OFFSET,
         );
         this.workerPromptText.setVisible(true);
       } else {

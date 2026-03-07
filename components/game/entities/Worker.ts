@@ -2,7 +2,6 @@ import * as Phaser from "phaser";
 import {
   FRAME_WIDTH,
   FRAME_HEIGHT,
-  SHEET_COLUMNS,
   MOVE_SPEED,
   makeAnims,
   type Direction,
@@ -13,30 +12,54 @@ import {
 } from "../config/emotes";
 import { ChatBubble } from "./ChatBubble";
 import { Pathfinder, type PathPoint } from "../utils/Pathfinder";
+import { buildSpriteFrames, type POIDef } from "../utils/MapHelpers";
+import {
+  WANDER_MIN_DELAY,
+  WANDER_MAX_DELAY,
+  WANDER_STAGGER_MS,
+  WANDER_INITIAL_MIN,
+  WANDER_INITIAL_MAX,
+  TASK_RESULT_HOLD_MS,
+  TASK_BUBBLE_MS,
+  TASK_THINK_DELAY_MS,
+  ARRIVE_THRESHOLD,
+  WORKER_SPEED_FACTOR,
+  STUCK_FRAME_LIMIT,
+  STUCK_MOVE_THRESHOLD,
+  POI_WANDER_CHANCE,
+  POI_STAY_MIN,
+  POI_STAY_MAX,
+  STAGGER_EXTRA_MIN,
+  STAGGER_EXTRA_MAX,
+  EMOTE_Y_OFFSET,
+  BUBBLE_Y_OFFSET,
+  BODY_SIZE_RATIO_W,
+  BODY_SIZE_RATIO_H,
+  BODY_OFFSET_RATIO_X,
+  BODY_OFFSET_RATIO_Y,
+  SEAT_ACTIVITIES,
+  POI_BUBBLE_TEXTS,
+} from "@/lib/constants";
 
 export type WorkerStatus = "idle" | "working" | "done" | "failed";
 
-export interface POI {
-  name: string;
-  x: number;
-  y: number;
-}
+export type POI = POIDef;
 
-const WANDER_MIN_DELAY = 3000;
-const WANDER_MAX_DELAY = 10000;
-const WANDER_STAGGER_MS = 1800;
-const TASK_RESULT_HOLD_MS = 4500;
-const ARRIVE_THRESHOLD = 8;
-const WORKER_SPEED = MOVE_SPEED * 0.55;
-const BODY_WIDTH = FRAME_WIDTH * 0.5;
-const BODY_HEIGHT = FRAME_HEIGHT * 0.2;
-const BODY_OFFSET_X = FRAME_WIDTH * 0.25;
-const BODY_OFFSET_Y = FRAME_HEIGHT * 0.75;
+const WORKER_SPEED = MOVE_SPEED * WORKER_SPEED_FACTOR;
+const BODY_WIDTH = FRAME_WIDTH * BODY_SIZE_RATIO_W;
+const BODY_HEIGHT = FRAME_HEIGHT * BODY_SIZE_RATIO_H;
+const BODY_OFFSET_X = FRAME_WIDTH * BODY_OFFSET_RATIO_X;
+const BODY_OFFSET_Y = FRAME_HEIGHT * BODY_OFFSET_RATIO_Y;
 const HOME_NAV_OFFSET_X = BODY_OFFSET_X + BODY_WIDTH / 2 - FRAME_WIDTH / 2;
 const HOME_NAV_OFFSET_Y = BODY_OFFSET_Y + BODY_HEIGHT / 2 - FRAME_HEIGHT / 2;
 
+const wanderClock = { lastStartedAt: -Infinity };
+
+export function resetWanderClock() {
+  wanderClock.lastStartedAt = -Infinity;
+}
+
 export class Worker {
-  private static lastWanderStartedAt = -Infinity;
 
   sprite: Phaser.Physics.Arcade.Sprite;
   bubble: ChatBubble;
@@ -72,6 +95,7 @@ export class Worker {
   private lastY = 0;
 
   /** Wander system */
+  private initTimer: Phaser.Time.TimerEvent | null = null;
   private wanderTimer: Phaser.Time.TimerEvent | null = null;
   private activityTimer: Phaser.Time.TimerEvent | null = null;
   private taskVisualTimer: Phaser.Time.TimerEvent | null = null;
@@ -104,7 +128,7 @@ export class Worker {
     this.homeX = x;
     this.homeY = y;
 
-    this.registerAnims(scene, spriteKey);
+    this.ensureAnims(scene, spriteKey);
 
     this.sprite = scene.physics.add.sprite(x, y, spriteKey, 0);
     this.sprite.setDepth(5);
@@ -141,8 +165,11 @@ export class Worker {
     this.bubble = new ChatBubble(scene);
     this.initEmoteSprite();
 
-    const initialDelay = Phaser.Math.Between(500, 4000);
-    scene.time.delayedCall(initialDelay, () => this.scheduleWander());
+    const initialDelay = Phaser.Math.Between(WANDER_INITIAL_MIN, WANDER_INITIAL_MAX);
+    this.initTimer = scene.time.delayedCall(initialDelay, () => {
+      this.initTimer = null;
+      this.scheduleWander();
+    });
   }
 
   // ── Emote system ──────────────────────────────────────
@@ -152,7 +179,7 @@ export class Worker {
 
     this.emoteSprite = this.scene.add.sprite(
       this.sprite.x,
-      this.sprite.y - FRAME_HEIGHT * 0.55,
+      this.sprite.y - FRAME_HEIGHT * EMOTE_Y_OFFSET,
       EMOTE_SHEET_KEY,
       0,
     );
@@ -180,6 +207,7 @@ export class Worker {
     if (this.currentEmoteKey === emoteKey) return;
 
     this.bubble.hide();
+    this.emoteSprite.removeAllListeners("animationcomplete");
 
     this.currentEmoteKey = emoteKey;
     this.emoteSprite.setVisible(true);
@@ -188,7 +216,8 @@ export class Worker {
     const anim = EMOTE_ANIMS.find((a) => a.key === emoteKey);
     if (anim && anim.repeat >= 0) {
       this.emoteSprite.once("animationcomplete", () => {
-        this.emoteSprite?.setVisible(false);
+        if (!this.emoteSprite) return;
+        this.emoteSprite.setVisible(false);
         this.currentEmoteKey = null;
       });
     }
@@ -203,23 +232,10 @@ export class Worker {
 
   // ── Animation registration ────────────────────────────
 
-  private registerAnims(scene: Phaser.Scene, spriteKey: string) {
+  private ensureAnims(scene: Phaser.Scene, spriteKey: string) {
     if (scene.anims.exists(`${spriteKey}:idle-down`)) return;
 
-    const tex = scene.textures.get(spriteKey);
-    const rows = Math.floor(tex.source[0].height / FRAME_HEIGHT);
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < SHEET_COLUMNS; col++) {
-        tex.add(
-          row * SHEET_COLUMNS + col,
-          0,
-          col * FRAME_WIDTH,
-          row * FRAME_HEIGHT,
-          FRAME_WIDTH,
-          FRAME_HEIGHT,
-        );
-      }
-    }
+    buildSpriteFrames(scene, spriteKey);
 
     const idleAnims = makeAnims(spriteKey, "idle", 1, 8);
     const walkAnims = makeAnims(spriteKey, "walk", 2, 10);
@@ -273,16 +289,16 @@ export class Worker {
     this.stopIdleActivity();
     this.assignedRunId = runId;
     this.setStatus("working");
-    this.showBubble(`📋 ${taskMessage}`, 4000);
+    this.showBubble(`📋 ${taskMessage}`, TASK_BUBBLE_MS);
     if (this.taskVisualTimer) {
       this.taskVisualTimer.destroy();
       this.taskVisualTimer = null;
     }
-    this.taskVisualTimer = this.scene.time.delayedCall(4200, () => {
+    this.taskVisualTimer = this.scene.time.delayedCall(TASK_THINK_DELAY_MS, () => {
       if (this._status === "working") this.showEmote("emote:thinking");
       this.taskVisualTimer = null;
     });
-    this.returnHome();
+    this.navigateHome();
   }
 
   completeTask() {
@@ -308,7 +324,7 @@ export class Worker {
       this.taskVisualTimer = null;
     }
     this.setStatus("failed");
-    this.showBubble("Task failed.", 4000);
+    this.showBubble("Task failed.", TASK_BUBBLE_MS);
     this.taskVisualTimer = this.scene.time.delayedCall(TASK_RESULT_HOLD_MS, () => {
       this.assignedRunId = null;
       this.setStatus("idle");
@@ -371,14 +387,6 @@ export class Worker {
 
   // ── Movement ──────────────────────────────────────────
 
-  /** Direct line movement (fallback, no pathfinding) */
-  moveTo(x: number, y: number) {
-    this.currentPath = [];
-    this.pathIndex = 0;
-    this.faceTarget = null;
-    this.moveTarget = { x, y };
-  }
-
   /**
    * A*-based navigation. If `facePoi` is given, the worker faces that
    * point on arrival (useful when POI itself is unreachable).
@@ -425,10 +433,6 @@ export class Worker {
     this.currentPath = [];
     this.pathIndex = 0;
     this.moveTarget = homeNav;
-  }
-
-  returnHome() {
-    this.navigateHome();
   }
 
   private faceToward(tx: number, ty: number) {
@@ -507,7 +511,7 @@ export class Worker {
     // skip to next waypoint or give up.
     const movedX = Math.abs(nav.x - this.lastX);
     const movedY = Math.abs(nav.y - this.lastY);
-    if (movedX < 0.5 && movedY < 0.5) {
+    if (movedX < STUCK_MOVE_THRESHOLD && movedY < STUCK_MOVE_THRESHOLD) {
       this.stuckFrames++;
     } else {
       this.stuckFrames = 0;
@@ -515,7 +519,7 @@ export class Worker {
     this.lastX = nav.x;
     this.lastY = nav.y;
 
-    if (this.stuckFrames > 120) {
+    if (this.stuckFrames > STUCK_FRAME_LIMIT) {
       this.stuckFrames = 0;
       if (this.currentPath.length > 0 && this.pathIndex < this.currentPath.length - 1) {
         this.pathIndex++;
@@ -530,11 +534,7 @@ export class Worker {
     const vy = (dy / dist) * WORKER_SPEED;
     (this.sprite.body as Phaser.Physics.Arcade.Body).setVelocity(vx, vy);
 
-    if (Math.abs(dx) > Math.abs(dy)) {
-      this.facing = dx > 0 ? "right" : "left";
-    } else {
-      this.facing = dy > 0 ? "down" : "up";
-    }
+    this.faceToward(this.moveTarget.x, this.moveTarget.y);
 
     const walkKey = `${this.spriteKey}:walk-${this.facing}`;
     if (this.sprite.anims.currentAnim?.key !== walkKey) {
@@ -545,7 +545,7 @@ export class Worker {
   // ── Wandering ─────────────────────────────────────────
 
   private scheduleWander() {
-    this.cancelWander();
+    this.stopIdleActivity();
     if (!this.canWander || this._status !== "idle") return;
 
     const delay = Phaser.Math.Between(WANDER_MIN_DELAY, WANDER_MAX_DELAY);
@@ -554,12 +554,8 @@ export class Worker {
     });
   }
 
-  private cancelWander() {
-    this.stopIdleActivity();
-  }
-
   private startWander() {
-    const goToPoi = this.pois.length > 0 && Math.random() < 0.35;
+    const goToPoi = this.pois.length > 0 && Math.random() < POI_WANDER_CHANCE;
 
     if (goToPoi) {
       this.wanderToPoi();
@@ -572,16 +568,16 @@ export class Worker {
     if (!this.canWander || this._status !== "idle") return;
 
     const now = this.scene.time.now;
-    const sinceLast = now - Worker.lastWanderStartedAt;
+    const sinceLast = now - wanderClock.lastStartedAt;
     if (sinceLast < WANDER_STAGGER_MS) {
-      const extraDelay = WANDER_STAGGER_MS - sinceLast + Phaser.Math.Between(250, 1200);
+      const extraDelay = WANDER_STAGGER_MS - sinceLast + Phaser.Math.Between(STAGGER_EXTRA_MIN, STAGGER_EXTRA_MAX);
       this.wanderTimer = this.scene.time.delayedCall(extraDelay, () => {
         this.tryStartWander();
       });
       return;
     }
 
-    Worker.lastWanderStartedAt = now;
+    wanderClock.lastStartedAt = now;
     this.startWander();
   }
 
@@ -593,9 +589,9 @@ export class Worker {
 
     this.onArrival = () => {
       if (this._status !== "idle" || !this.canWander) return;
-      this.showBubble(Worker.poiBubbleText(poi.name), 3000);
+      this.showBubble(Worker.poiBubbleText(poi.name), POI_STAY_MIN);
 
-      const stayDuration = Phaser.Math.Between(3000, 6000);
+      const stayDuration = Phaser.Math.Between(POI_STAY_MIN, POI_STAY_MAX);
       if (this.activityTimer) {
         this.activityTimer.destroy();
         this.activityTimer = null;
@@ -617,29 +613,16 @@ export class Worker {
 
   /** Do something at the seat (no movement) */
   private seatActivity() {
-    const activities: Array<{ emote: string; bubbles: string[]; duration: number }> = [
-      { emote: "emote:sleep",    bubbles: ["Zzz...", "So sleepy...", "*dozing off*"],      duration: Phaser.Math.Between(6000, 14000) },
-      { emote: "emote:sleep",    bubbles: ["*stretch*", "*yawn~*", "5 more minutes..."],   duration: Phaser.Math.Between(4000, 8000) },
-      { emote: "emote:thinking", bubbles: ["Hmm...", "Let me think...", "How does this work?"], duration: Phaser.Math.Between(5000, 10000) },
-      { emote: "emote:thinking", bubbles: ["Reading docs...", "Taking notes...", "Interesting article~"], duration: Phaser.Math.Between(5000, 10000) },
-      { emote: "emote:wrench",   bubbles: ["Debugging...", "Writing code~", "Fixing bugs..."], duration: Phaser.Math.Between(5000, 12000) },
-      { emote: "emote:wrench",   bubbles: ["Refactoring~", "Almost done!", "One more test..."], duration: Phaser.Math.Between(4000, 8000) },
-      { emote: "emote:star",     bubbles: ["Got it!", "Eureka!", "Great idea!"],            duration: Phaser.Math.Between(2000, 4000) },
-      { emote: "emote:heart",    bubbles: ["Feeling great!", "Love this~", "Best day ever!"], duration: Phaser.Math.Between(3000, 5000) },
-      { emote: "emote:music",    bubbles: ["~♪♪~", "Humming~", "Good vibes~"],             duration: Phaser.Math.Between(3000, 6000) },
-      { emote: "emote:confused", bubbles: ["Huh?", "This is weird...", "What happened?"],  duration: Phaser.Math.Between(3000, 6000) },
-      { emote: "emote:angry",    bubbles: ["Ugh...", "This bug...", "Not again!"],          duration: Phaser.Math.Between(2000, 4000) },
-    ];
+    const def = Phaser.Utils.Array.GetRandom(SEAT_ACTIVITIES) as typeof SEAT_ACTIVITIES[number];
+    const duration = Phaser.Math.Between(def.minDuration, def.maxDuration);
 
-    const act = Phaser.Utils.Array.GetRandom(activities) as typeof activities[number];
-
-    this.showEmote(act.emote);
+    this.showEmote(def.emote);
 
     if (this.activityTimer) {
       this.activityTimer.destroy();
       this.activityTimer = null;
     }
-    this.activityTimer = this.scene.time.delayedCall(act.duration, () => {
+    this.activityTimer = this.scene.time.delayedCall(duration, () => {
       if (this._status !== "idle" || !this.canWander) return;
       this.hideEmote();
       this.scheduleWander();
@@ -647,20 +630,9 @@ export class Worker {
     });
   }
 
-  // ── POI bubble texts ─────────────────────────────────
-
-  private static readonly POI_BUBBLES: Record<string, string[]> = {
-    water: ["Getting water...", "Staying hydrated!", "Refilling bottle~"],
-    printer: ["Checking prints...", "Printing docs...", "Paper jam again?"],
-    book: ["Browsing books...", "Looking up reference~", "Good read!"],
-    whiteboard: ["Reviewing plans...", "Sketching ideas~", "Hmm, let me think..."],
-    sofa: ["Taking a break~", "Quick rest...", "So comfy..."],
-    coffee: ["Need caffeine!", "Making coffee~", "Espresso time!"],
-  };
-
   private static poiBubbleText(poiName: string): string {
     const lower = poiName.toLowerCase();
-    for (const [keyword, texts] of Object.entries(Worker.POI_BUBBLES)) {
+    for (const [keyword, texts] of Object.entries(POI_BUBBLE_TEXTS)) {
       if (lower.includes(keyword)) {
         return texts[Math.floor(Math.random() * texts.length)];
       }
@@ -675,7 +647,7 @@ export class Worker {
     this.hideEmote();
 
     const bubbleX = this.sprite.x;
-    const bubbleY = this.sprite.y - FRAME_HEIGHT * 0.45;
+    const bubbleY = this.sprite.y - FRAME_HEIGHT * BUBBLE_Y_OFFSET;
     this.bubble.show(message, bubbleX, bubbleY, ttl);
   }
 
@@ -724,14 +696,14 @@ export class Worker {
     if (this.emoteSprite) {
       this.emoteSprite.setPosition(
         this.sprite.x,
-        this.sprite.y - FRAME_HEIGHT * 0.55,
+        this.sprite.y - FRAME_HEIGHT * EMOTE_Y_OFFSET,
       );
     }
 
     if (this.bubble) {
       this.bubble.updatePosition(
         this.sprite.x,
-        this.sprite.y - FRAME_HEIGHT * 0.45,
+        this.sprite.y - FRAME_HEIGHT * BUBBLE_Y_OFFSET,
       );
     }
   }
@@ -739,12 +711,15 @@ export class Worker {
   // ── Cleanup ───────────────────────────────────────────
 
   destroy() {
-    this.cancelWander();
-    if (this.taskVisualTimer) this.taskVisualTimer.destroy();
+    if (this.initTimer) { this.initTimer.destroy(); this.initTimer = null; }
+    this.stopIdleActivity();
+    if (this.taskVisualTimer) { this.taskVisualTimer.destroy(); this.taskVisualTimer = null; }
+    if (this.emoteSprite) { this.emoteSprite.removeAllListeners(); this.emoteSprite.destroy(); this.emoteSprite = null; }
     this.sprite.destroy();
     this.nameTag.destroy();
     this.statusDot.destroy();
     this.bubble.destroy();
-    this.emoteSprite?.destroy();
+    this.pathfinder = null;
+    this.onArrival = null;
   }
 }

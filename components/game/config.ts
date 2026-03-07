@@ -1,10 +1,11 @@
 import * as Phaser from "phaser";
 import { OfficeScene } from "./scenes/OfficeScene";
+import { GAME_WIDTH, GAME_HEIGHT } from "@/lib/constants";
 
 export const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
-  width: 1280,
-  height: 720,
+  width: GAME_WIDTH,
+  height: GAME_HEIGHT,
   pixelArt: true,
   antialias: false,
   roundPixels: true,

@@ -3,13 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { useStudio } from "@/lib/store";
-import {
-  FRAME_HEIGHT,
-  FRAME_WIDTH,
-  SHEET_COLUMNS,
-  WORKER_SPRITES,
-} from "@/components/game/config/animations";
+import { WORKER_SPRITES } from "@/components/game/config/animations";
 import type { SeatState } from "@/types/game";
+import CharacterPortrait from "./CharacterPortrait";
 
 const ROLE_PRESETS = [
   "Frontend Engineer",
@@ -20,44 +16,6 @@ const ROLE_PRESETS = [
   "QA",
   "Researcher",
 ];
-
-const PORTRAIT_FRAME_INDEX = SHEET_COLUMNS + 18;
-
-function CharacterPortrait({
-  spritePath,
-  name,
-  large = false,
-}: {
-  spritePath?: string;
-  name: string;
-  large?: boolean;
-}) {
-  const scale = large ? 2.4 : 1.1;
-  const width = FRAME_WIDTH * scale;
-  const height = FRAME_HEIGHT * scale;
-  const frameX = (PORTRAIT_FRAME_INDEX % SHEET_COLUMNS) * FRAME_WIDTH;
-  const frameY = Math.floor(PORTRAIT_FRAME_INDEX / SHEET_COLUMNS) * FRAME_HEIGHT;
-
-  if (!spritePath) {
-    return <span style={{ fontSize: 8, color: "var(--pixel-muted)" }}>EMPTY</span>;
-  }
-
-  return (
-    <div
-      aria-label={name}
-      style={{
-        width,
-        height,
-        backgroundImage: `url(${spritePath})`,
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: `-${frameX * scale}px -${frameY * scale}px`,
-        backgroundSize: `${SHEET_COLUMNS * FRAME_WIDTH * scale}px auto`,
-        imageRendering: "pixelated",
-        flexShrink: 0,
-      }}
-    />
-  );
-}
 
 function seatStateLabel(seat: SeatState) {
   if (!seat.assigned) return "vacant";

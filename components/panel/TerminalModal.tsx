@@ -19,14 +19,15 @@ export default function TerminalModal() {
     gameEvents.emit("terminal-closed");
   }, []);
 
-  // Listen for scene "open terminal" event
   useEffect(() => {
-    const openForSeat = (seatId?: unknown) => {
-      setTargetSeatId(typeof seatId === "string" ? seatId : undefined);
+    const unsubOpen = gameEvents.on("open-terminal", (seatId) => {
+      setTargetSeatId(seatId);
       setOpen(true);
-    };
-    const unsubOpen = gameEvents.on("open-terminal", openForSeat);
-    const unsubQueue = gameEvents.on("open-terminal-queue", openForSeat);
+    });
+    const unsubQueue = gameEvents.on("open-terminal-queue", (seatId) => {
+      setTargetSeatId(seatId);
+      setOpen(true);
+    });
     return () => {
       unsubOpen();
       unsubQueue();

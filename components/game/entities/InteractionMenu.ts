@@ -169,13 +169,16 @@ export class InteractionMenu {
 
   private moveSelection(dir: number) {
     const len = this.options.length;
+    if (len === 0) return;
     let next = this.selectedIndex;
     for (let attempt = 0; attempt < len; attempt++) {
       next = (next + dir + len) % len;
-      if (this.options[next].enabled) break;
+      if (this.options[next].enabled) {
+        this.selectedIndex = next;
+        this.updateHighlight();
+        return;
+      }
     }
-    this.selectedIndex = next;
-    this.updateHighlight();
   }
 
   private updateHighlight() {
@@ -196,5 +199,17 @@ export class InteractionMenu {
   destroy() {
     this.clearItems();
     this.container.destroy();
+
+    const kb = this.scene.input.keyboard;
+    if (kb) {
+      kb.removeKey(this.upKey, true);
+      kb.removeKey(this.downKey, true);
+      kb.removeKey(this.upArrow, true);
+      kb.removeKey(this.downArrow, true);
+      kb.removeKey(this.confirmKey, true);
+      kb.removeKey(this.enterKey, true);
+      kb.removeKey(this.escKey, true);
+    }
+    this.onClose = null;
   }
 }

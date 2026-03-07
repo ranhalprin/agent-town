@@ -1,14 +1,14 @@
 import * as Phaser from "phaser";
 
-const BUBBLE_PAD_X = 8;
-const BUBBLE_PAD_Y = 5;
-const BUBBLE_MAX_WIDTH = 180;
+const BUBBLE_PAD_X = 10;
+const BUBBLE_PAD_Y = 6;
+const BUBBLE_MAX_WIDTH = 220;
 const BUBBLE_RADIUS = 6;
 const TAIL_SIZE = 6;
 const FADE_DURATION = 400;
 const DEFAULT_TTL = 5000;
-const BUBBLE_FONT_SIZE = 6;
-const BUBBLE_FONT_FAMILY = '"Press Start 2P", "Zpix", monospace';
+const BUBBLE_FONT_SIZE = 8;
+const BUBBLE_FONT_FAMILY = '"Zpix20260307", "Zpix", monospace';
 
 export class ChatBubble {
   private container: Phaser.GameObjects.Container;
@@ -25,7 +25,7 @@ export class ChatBubble {
       fontFamily: BUBBLE_FONT_FAMILY,
       fontSize: `${BUBBLE_FONT_SIZE}px`,
       color: "#1a1a2e",
-      lineSpacing: 4,
+      lineSpacing: 6,
     });
     this.text.setOrigin(0, 0);
     this.measureCtx = document.createElement("canvas").getContext("2d");
@@ -70,6 +70,7 @@ export class ChatBubble {
       this.fadeTimer.destroy();
       this.fadeTimer = null;
     }
+    this.scene.tweens.killTweensOf(this.container);
 
     const displayText = message.length > 100 ? message.slice(0, 97) + "..." : message;
     this.text.setText(this.wrapText(displayText));
@@ -117,6 +118,7 @@ export class ChatBubble {
 
     if (ttl > 0) {
       this.fadeTimer = this.scene.time.delayedCall(ttl, () => {
+        this.fadeTimer = null;
         this.scene.tweens.add({
           targets: this.container,
           alpha: 0,
@@ -136,11 +138,14 @@ export class ChatBubble {
       this.fadeTimer.destroy();
       this.fadeTimer = null;
     }
+    this.scene.tweens.killTweensOf(this.container);
     this.container.setVisible(false);
   }
 
   destroy() {
     if (this.fadeTimer) this.fadeTimer.destroy();
+    this.scene.tweens.killTweensOf(this.container);
+    this.measureCtx = null;
     this.container.destroy();
   }
 }

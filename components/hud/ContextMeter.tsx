@@ -1,16 +1,11 @@
 "use client";
 
+import { formatCompact } from "@/lib/constants";
+
 interface ContextMeterProps {
   usedTokens?: number;
   maxTokens?: number;
   fresh: boolean;
-}
-
-function formatCompact(value?: number) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "--";
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-  return `${Math.round(value)}`;
 }
 
 export default function ContextMeter({

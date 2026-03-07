@@ -1,11 +1,3 @@
-export interface AgentState {
-  id: string;
-  name: string;
-  status: "idle" | "working" | "talking";
-  x: number;
-  y: number;
-}
-
 // --- Studio domain types ---
 
 export type ConnectionStatus =
@@ -36,7 +28,6 @@ export interface SeatState {
 
 export type TaskStatus =
   | "submitted"
-  | "accepted"
   | "running"
   | "completed"
   | "failed";

@@ -43,6 +43,9 @@ export class GatewayClient {
   private url: string;
   private token: string;
 
+  private connectReject: ((err: Error) => void) | null = null;
+  private connectSettled = false;
+
   constructor(url: string, token: string) {
     this.url = url;
     this.token = token;
@@ -78,6 +81,8 @@ export class GatewayClient {
       }
 
       this.setStatus("connecting");
+      this.connectSettled = false;
+      this.connectReject = reject;
 
       const ws = new WebSocket(this.url);
       this.ws = ws;
@@ -93,17 +98,23 @@ export class GatewayClient {
         } catch {
           return;
         }
-        this.handleFrame(frame, resolve);
+        this.handleFrame(frame, (res) => {
+          if (!this.connectSettled) {
+            this.connectSettled = true;
+            this.connectReject = null;
+            resolve(res);
+          }
+        });
       };
 
       ws.onerror = () => {
         this.setStatus("error");
-        reject(new Error("WebSocket connection error"));
+        this.rejectConnect(new Error("WebSocket connection error"));
       };
 
       ws.onclose = () => {
         this.setStatus("disconnected");
-        // Reject all pending requests
+        this.rejectConnect(new Error("Connection closed before handshake"));
         for (const [id, p] of this.pending) {
           p.reject(new Error("Connection closed"));
           clearTimeout(p.timer);
@@ -111,6 +122,14 @@ export class GatewayClient {
         }
       };
     });
+  }
+
+  private rejectConnect(err: Error) {
+    if (!this.connectSettled) {
+      this.connectSettled = true;
+      this.connectReject?.(err);
+      this.connectReject = null;
+    }
   }
 
   private handleFrame(frame: GatewayFrame, onConnected?: (res: GatewayFrame) => void) {
@@ -198,10 +217,10 @@ export class GatewayClient {
       },
     };
 
-    // Register as pending so the response routes correctly
     const timer = setTimeout(() => {
       this.pending.delete(id);
       this.setStatus("error");
+      this.rejectConnect(new Error("Handshake timeout (15s)"));
     }, 15000);
 
     this.pending.set(id, {

@@ -26,16 +26,19 @@ import { gameEvents } from "./events";
 import { getDefaultGatewayUrl } from "./utils";
 import { WORKER_SPRITES } from "@/components/game/config/animations";
 
+import {
+  LS_CONFIG,
+  LS_TASKS,
+  LS_CHAT,
+  LS_SESSIONS,
+  LS_ACTIVE_KEY,
+  LS_SEAT_CONFIG,
+  MAX_CHAT,
+  MAX_SESSIONS,
+} from "./constants";
+
 // ── localStorage helpers ──────────────────────────────────
 
-const LS_CONFIG = "agent-world:gateway-config";
-const LS_TASKS = "agent-world:tasks";
-const LS_CHAT = "agent-world:chat";
-const LS_SESSIONS = "agent-world:sessions";
-const LS_ACTIVE_KEY = "agent-world:active-session-key";
-const LS_SEAT_CONFIG = "agent-world:seat-config";
-const MAX_CHAT = 500;
-const MAX_SESSIONS = 20;
 const CONNECTED_TO_PREFIX = "Connected to ";
 
 function lsGet<T>(key: string, fallback: T): T {
@@ -56,22 +59,16 @@ function lsSet(key: string, value: unknown) {
 
 // ── Helpers ───────────────────────────────────────────────
 
-let chatSeq = 0;
+let _chatSeq = 0;
 function chatId(): string {
-  return `chat_${Date.now()}_${++chatSeq}`;
+  return `chat_${Date.now()}_${++_chatSeq}`;
 }
 
 function isRedundantConnectionMessage(msg: ChatMessage): boolean {
   return msg.role === "system" && msg.content.startsWith(CONNECTED_TO_PREFIX);
 }
 
-interface DiscoveredSeat {
-  seatId: string;
-  x: number;
-  y: number;
-  facing?: SeatState["spawnFacing"];
-  index: number;
-}
+import type { SeatDef as DiscoveredSeat } from "@/components/game/utils/MapHelpers";
 
 interface PersistedSeatConfig {
   seatId: string;
@@ -102,9 +99,9 @@ function createEmptySessionMetrics(): SessionMetrics {
   };
 }
 
-let sessionSeq = 0;
+let _sessionSeq = 0;
 function generateSessionKey(): string {
-  return `agent:main:${Date.now()}_${++sessionSeq}`;
+  return `agent:main:${Date.now()}_${++_sessionSeq}`;
 }
 
 function patchTasks(tasks: TaskItem[], taskId: string, patch: Partial<TaskItem>) {
@@ -445,10 +442,6 @@ const DEFAULT_TOKEN = process.env.NEXT_PUBLIC_GATEWAY_TOKEN ?? "";
 
 const SUBAGENT_KEY_RE = /subagent:/;
 const MAIN_SESSION_KEY = "agent:main:main";
-let taskCounter = 0;
-const seenStarts = new Set<string>();
-/** Accumulated assistant text per runId — used for game bubbles */
-const bubbleAccum = new Map<string, string>();
 
 interface SessionListRow {
   key: string;
@@ -504,6 +497,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const activeSessionKeyRef = useRef<string | undefined>(undefined);
   const sessionRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const modelCatalogRef = useRef<ModelChoice[] | null>(null);
+
+  const taskCounterRef = useRef(0);
+  const seenStartsRef = useRef(new Set<string>());
+  const bubbleAccumRef = useRef(new Map<string, string>());
 
   const setActiveSessionKey = useCallback((sessionKey?: string) => {
     activeSessionKeyRef.current = sessionKey;
@@ -644,8 +641,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       }
 
       if (stream === "lifecycle") {
-        if (data?.phase === "start" && !seenStarts.has(runId)) {
-          seenStarts.add(runId);
+        if (data?.phase === "start" && !seenStartsRef.current.has(runId)) {
+          seenStartsRef.current.add(runId);
           if (isSubagent) {
             dispatchRef.current({
               type: "ASSIGN_SEAT",
@@ -668,8 +665,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             scheduleSessionMetricsRefresh();
           }
         } else if (data?.phase === "end") {
-          seenStarts.delete(runId);
-          bubbleAccum.delete(runId);
+          seenStartsRef.current.delete(runId);
+          bubbleAccumRef.current.delete(runId);
           gameEvents.emit("task-completed", runId);
           dispatchRef.current({ type: "SET_SEAT_STATUS", runId, status: "done" });
           dispatchRef.current({
@@ -686,8 +683,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           });
           scheduleSessionMetricsRefresh(400);
         } else if (data?.phase === "error") {
-          seenStarts.delete(runId);
-          bubbleAccum.delete(runId);
+          seenStartsRef.current.delete(runId);
+          bubbleAccumRef.current.delete(runId);
           gameEvents.emit("task-failed", runId);
           dispatchRef.current({ type: "SET_SEAT_STATUS", runId, status: "failed" });
           dispatchRef.current({
@@ -732,8 +729,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (stream === "assistant" && data?.delta) {
         const delta = typeof data.delta === "string" ? data.delta : "";
         if (delta.length > 0) {
-          const accum = (bubbleAccum.get(runId) ?? "") + delta;
-          bubbleAccum.set(runId, accum);
+          const accum = (bubbleAccumRef.current.get(runId) ?? "") + delta;
+          bubbleAccumRef.current.set(runId, accum);
           const display = accum.length > 80 ? "..." + accum.slice(-77) : accum;
           gameEvents.emit("task-bubble", runId, display, 4000);
           dispatchRef.current({
@@ -863,8 +860,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "SET_ACTIVE_SESSION", sessionKey: savedActiveKey });
     }
 
-    const unsubSeats = gameEvents.on("seats-discovered", (payload: unknown) => {
-      const discovered = Array.isArray(payload) ? payload as DiscoveredSeat[] : [];
+    const unsubSeats = gameEvents.on("seats-discovered", (discovered) => {
       const mergedSeats = mergeDiscoveredSeats(discovered, seatConfigRef.current, seatsRef.current);
       dispatchRef.current({ type: "SYNC_SEATS", seats: mergedSeats });
     });
@@ -941,7 +937,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     const client = clientRef.current;
     if (!client || client.status !== "connected") return;
 
-    const idempotencyKey = `aw_task_${++taskCounter}_${Date.now()}`;
+    const idempotencyKey = `aw_task_${++taskCounterRef.current}_${Date.now()}`;
     const actorName = resolveSeatLabelForTask(seatsRef.current, seatId);
 
     dispatchRef.current({
@@ -1077,8 +1073,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       createdAt: new Date().toISOString(),
     };
 
-    bubbleAccum.clear();
-    seenStarts.clear();
+    bubbleAccumRef.current.clear();
+    seenStartsRef.current.clear();
 
     activeSessionKeyRef.current = newKey;
     dispatchRef.current({ type: "NEW_SESSION", session: record });
@@ -1092,20 +1088,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const switchSession = useCallback(async (sessionKey: string) => {
     if (sessionKey === activeSessionKeyRef.current) return;
 
-    bubbleAccum.clear();
-    seenStarts.clear();
-
+    bubbleAccumRef.current.clear();
+    seenStartsRef.current.clear();
     activeSessionKeyRef.current = sessionKey;
-
-    dispatchRef.current({
-      type: "SWITCH_SESSION",
-      sessionKey,
-      tasks: [],
-      chatMessages: [],
-    });
     lsSet(LS_ACTIVE_KEY, sessionKey);
 
     const messages = await loadSessionPreview(sessionKey);
+
+    if (activeSessionKeyRef.current !== sessionKey) return;
+
     dispatchRef.current({
       type: "SWITCH_SESSION",
       sessionKey,

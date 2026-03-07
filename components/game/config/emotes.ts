@@ -18,7 +18,6 @@
 export const EMOTE_SHEET_KEY = "emotes";
 export const EMOTE_SHEET_PATH = "/sprites/emotes_48x48.png";
 export const EMOTE_FRAME_SIZE = 48;
-export const EMOTE_COLS = 10;
 
 export interface EmoteDef {
   key: string;

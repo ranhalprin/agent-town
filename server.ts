@@ -53,6 +53,9 @@ app.prepare().then(() => {
     console.log(`> Ready on http://localhost:${port}`);
     console.log(`> Gateway proxy: ws://localhost:${port}/api/gateway → ${GATEWAY_URL}`);
   });
+}).catch((err) => {
+  console.error("Failed to prepare Next.js:", err);
+  process.exit(1);
 });
 
 function proxyWebSocket(clientWs: WebSocket) {

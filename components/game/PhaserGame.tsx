@@ -8,15 +8,17 @@ export default function PhaserGame() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let game: PhaserTypes.Game | null = null;
+    let mounted = true;
 
     async function initGame() {
-      if (!containerRef.current || gameRef.current) return;
+      if (!containerRef.current) return;
 
       const { gameConfig } = await import("./config");
       const Phaser = await import("phaser");
 
-      game = new Phaser.Game({
+      if (!mounted) return;
+
+      const game = new Phaser.Game({
         ...gameConfig,
         parent: containerRef.current,
       });
@@ -26,6 +28,7 @@ export default function PhaserGame() {
     initGame();
 
     return () => {
+      mounted = false;
       if (gameRef.current) {
         gameRef.current.destroy(true);
         gameRef.current = null;
