@@ -30,7 +30,7 @@ export default function TaskPanel({ tasks }: { tasks: TaskItem[] }) {
         {tasks.length === 0 ? (
           <div className="hud-empty">No tasks yet.</div>
         ) : (
-          tasks.slice(0, 10).map((task) => (
+          tasks.map((task) => (
             <div key={task.taskId} className="hud-list__item">
               <div className="hud-list__top">
                 <span className={`hud-status hud-status--${task.status}`}>{taskStatusLabel(task.status)}</span>

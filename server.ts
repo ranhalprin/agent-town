@@ -14,6 +14,8 @@ const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT ?? "3000", 10);
 
 const GATEWAY_URL = process.env.GATEWAY_URL ?? "ws://127.0.0.1:18789/";
+const MAX_BUFFERED_MESSAGES = 100;
+const UPSTREAM_CONNECT_TIMEOUT_MS = 15000;
 
 function isForwardableCloseCode(code: number) {
   return (
@@ -63,7 +65,19 @@ function proxyWebSocket(clientWs: WebSocket) {
   const upstream = new WebSocket(GATEWAY_URL);
   const bufferedMessages: Array<{ data: RawData; isBinary: boolean }> = [];
 
+  const connectTimeout = setTimeout(() => {
+    if (upstream.readyState === WebSocket.CONNECTING) {
+      console.error("[WS Proxy] upstream connection timeout");
+      bufferedMessages.length = 0;
+      upstream.terminate();
+      if (clientWs.readyState === WebSocket.OPEN) {
+        clientWs.close(1011, "Gateway connection timeout");
+      }
+    }
+  }, UPSTREAM_CONNECT_TIMEOUT_MS);
+
   upstream.on("open", () => {
+    clearTimeout(connectTimeout);
     for (const message of bufferedMessages) {
       upstream.send(message.data, { binary: message.isBinary });
     }
@@ -71,8 +85,12 @@ function proxyWebSocket(clientWs: WebSocket) {
   });
 
   upstream.on("message", (data, isBinary) => {
-    if (clientWs.readyState === WebSocket.OPEN) {
-      clientWs.send(data, { binary: isBinary });
+    try {
+      if (clientWs.readyState === WebSocket.OPEN) {
+        clientWs.send(data, { binary: isBinary });
+      }
+    } catch (err) {
+      console.error("[WS Proxy] send to client failed:", (err as Error).message);
     }
   });
 
@@ -101,14 +119,15 @@ function proxyWebSocket(clientWs: WebSocket) {
       return;
     }
 
-    if (upstream.readyState === WebSocket.CONNECTING) {
+    if (upstream.readyState === WebSocket.CONNECTING && bufferedMessages.length < MAX_BUFFERED_MESSAGES) {
       bufferedMessages.push({ data, isBinary });
     }
   });
 
   clientWs.on("close", () => {
+    clearTimeout(connectTimeout);
     bufferedMessages.length = 0;
-    if (upstream.readyState === WebSocket.OPEN) {
+    if (upstream.readyState === WebSocket.OPEN || upstream.readyState === WebSocket.CONNECTING) {
       upstream.close();
     }
   });

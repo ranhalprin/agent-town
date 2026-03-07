@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Sparkles, Users } from "lucide-react";
 import { useStudio } from "@/lib/store";
 import { STATUS_LABELS, formatModelLabel, isVisibleChatMessage } from "@/lib/constants";
+import { MAIN_SESSION_KEY } from "@/lib/reducer";
 import ContextMeter from "./ContextMeter";
 import HudDock, { type HudDockItem, type HudPanelId } from "./HudDock";
 import ConnectionPanel from "./ConnectionPanel";
@@ -16,7 +17,7 @@ export default function GameHud() {
   const { state } = useStudio();
   const [openPanel, setOpenPanel] = useState<HudPanelId | null>(null);
   const [seatManagerOpen, setSeatManagerOpen] = useState(false);
-  const activeSessionKey = state.activeSessionKey ?? "agent:main:main";
+  const activeSessionKey = state.activeSessionKey ?? MAIN_SESSION_KEY;
   const visibleTasks = useMemo(
     () => state.tasks.filter((task) => task.sessionKey === activeSessionKey),
     [activeSessionKey, state.tasks],

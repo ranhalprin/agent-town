@@ -26,6 +26,7 @@ import { chatId, findTask, MAIN_SESSION_KEY, resolveSeatLabelForTask } from "./r
 
 const SUBAGENT_KEY_RE = /subagent:/;
 const BUBBLE_THROTTLE_MS = 150;
+const MAX_BUBBLE_ACCUM = 50_000;
 
 interface HandlerRefs {
   dispatch: () => Dispatch<Action>;
@@ -181,6 +182,14 @@ function emitBubbleThrottled(refs: HandlerRefs, runId: string, text: string, ttl
   refs.bubbleThrottleTimers.set(runId, timer);
 }
 
+function clearBubbleTimer(refs: HandlerRefs, runId: string) {
+  const timer = refs.bubbleThrottleTimers.get(runId);
+  if (timer) {
+    clearTimeout(timer);
+    refs.bubbleThrottleTimers.delete(runId);
+  }
+}
+
 function fmtJson(v: unknown): string {
   return typeof v === "string" ? v : JSON.stringify(v, null, 2);
 }
@@ -240,11 +249,13 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
         if (existingTask?.status === "stopped") {
           refs.seenStarts.delete(runId);
           refs.bubbleAccum.delete(runId);
+          clearBubbleTimer(refs, runId);
           refresh(400);
           return;
         }
         refs.seenStarts.delete(runId);
         refs.bubbleAccum.delete(runId);
+        clearBubbleTimer(refs, runId);
         gameEvents.emit("task-completed", runId);
         dispatch()({ type: "SET_SEAT_STATUS", runId, status: "done" });
         dispatch()({
@@ -266,11 +277,13 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
         if (existingTask?.status === "stopped") {
           refs.seenStarts.delete(runId);
           refs.bubbleAccum.delete(runId);
+          clearBubbleTimer(refs, runId);
           refresh(400);
           return;
         }
         refs.seenStarts.delete(runId);
         refs.bubbleAccum.delete(runId);
+        clearBubbleTimer(refs, runId);
         gameEvents.emit("task-failed", runId);
         dispatch()({ type: "SET_SEAT_STATUS", runId, status: "failed" });
         dispatch()({
@@ -315,7 +328,8 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
     if (isAssistantDelta(stream, data)) {
       const delta = typeof data.delta === "string" ? data.delta : "";
       if (delta.length > 0) {
-        const accum = (refs.bubbleAccum.get(runId) ?? "") + delta;
+        const raw = (refs.bubbleAccum.get(runId) ?? "") + delta;
+        const accum = raw.length > MAX_BUBBLE_ACCUM ? raw.slice(-MAX_BUBBLE_ACCUM) : raw;
         refs.bubbleAccum.set(runId, accum);
         const display = accum.length > 80 ? "..." + accum.slice(-77) : accum;
         emitBubbleThrottled(refs, runId, display, 4000);

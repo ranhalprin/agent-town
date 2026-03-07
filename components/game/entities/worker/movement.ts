@@ -165,10 +165,11 @@ export function navigateTo(
   ctx.currentPath = [];
   ctx.pathIndex = 0;
   ctx.moveTarget = null;
+  ctx.faceTarget = null;
   if (ctx.onArrival) {
     const cb = ctx.onArrival;
     ctx.onArrival = null;
-    cb();
+    ctx.scene.time.delayedCall(0, cb);
   }
 }
 

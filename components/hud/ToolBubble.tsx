@@ -1,35 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import type { ChatMessage } from "@/types/game";
+import type { ToolChatMessage } from "@/types/game";
 
-function parseToolParts(msg: ChatMessage): { summary: string; detail: string | null } {
-  if (msg.toolName) {
-    let summary = msg.toolName;
-    if (msg.toolInput) {
-      try {
-        const parsed = JSON.parse(msg.toolInput);
-        const hint =
-          parsed.command ?? parsed.path ?? parsed.filename ?? parsed.pattern ?? parsed.query ?? parsed.url;
-        if (typeof hint === "string") {
-          const short = hint.length > 60 ? hint.slice(0, 57) + "..." : hint;
-          summary = `${msg.toolName}  ${short}`;
-        }
-      } catch {}
-    }
-    return { summary, detail: msg.toolOutput ?? null };
+function parseToolParts(msg: ToolChatMessage): { summary: string; detail: string | null } {
+  let summary = msg.toolName;
+  if (msg.toolInput) {
+    try {
+      const parsed = JSON.parse(msg.toolInput);
+      const hint =
+        parsed.command ?? parsed.path ?? parsed.filename ?? parsed.pattern ?? parsed.query ?? parsed.url;
+      if (typeof hint === "string") {
+        const short = hint.length > 60 ? hint.slice(0, 57) + "..." : hint;
+        summary = `${msg.toolName}  ${short}`;
+      }
+    } catch {}
   }
-
-  const text = msg.content ?? "";
-  const firstLine = text.split("\n")[0].trim();
-  const rest = text.slice(firstLine.length).trim();
-  if (rest.length > 0) {
-    return { summary: firstLine || "tool", detail: rest };
-  }
-  return { summary: firstLine || "tool", detail: null };
+  return { summary, detail: msg.toolOutput ?? null };
 }
 
-export default function ToolBubble({ msg }: { msg: ChatMessage }) {
+export default function ToolBubble({ msg }: { msg: ToolChatMessage }) {
   const [expanded, setExpanded] = useState(false);
   const { summary, detail } = parseToolParts(msg);
 

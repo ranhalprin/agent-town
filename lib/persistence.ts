@@ -45,7 +45,9 @@ export function lsGet<T>(key: string, fallback: T): T {
 export function lsSet(key: string, value: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
+  } catch (err) {
+    console.warn(`[persistence] failed to write "${key}":`, err);
+  }
 }
 
 // ── Domain-specific loaders ────────────────────────────

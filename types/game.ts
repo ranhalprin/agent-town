@@ -48,21 +48,30 @@ export interface TaskItem {
   completedAt?: string;
 }
 
-export interface ChatMessage {
+export interface ChatMessageBase {
   id: string;
   runId: string;
-  role: "user" | "assistant" | "tool" | "system";
-  content: string;
   timestamp: string;
   sessionKey: string;
   actorName?: string;
+}
+
+interface TextChatMessage extends ChatMessageBase {
+  role: "user" | "assistant" | "system";
+  content: string;
   /** true while assistant message is still receiving streaming deltas */
   streaming?: boolean;
-  /** tool call: structured name + input + output */
-  toolName?: string;
+}
+
+export interface ToolChatMessage extends ChatMessageBase {
+  role: "tool";
+  content: string;
+  toolName: string;
   toolInput?: string;
   toolOutput?: string;
 }
+
+export type ChatMessage = TextChatMessage | ToolChatMessage;
 
 export interface GatewayConfig {
   url: string;

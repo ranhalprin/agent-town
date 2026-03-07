@@ -90,11 +90,9 @@ export function abortTask(ctx: WorkerCtx, runId: string): boolean {
 
   ctx.stopIdleActivity();
   ctx.assignedRunId = null;
-  ctx.setStatus("done");
   ctx.showBubble("Task stopped.", TASK_BUBBLE_MS);
   ctx.taskVisualTimer = ctx.scene.time.delayedCall(TASK_RESULT_HOLD_MS, () => {
     ctx.taskVisualTimer = null;
-    if (ctx._status !== "done") return;
     ctx.setStatus("idle");
     processQueue(ctx);
   });

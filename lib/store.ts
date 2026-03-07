@@ -418,8 +418,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
     bubbleAccumRef.current.clear();
     seenStartsRef.current.clear();
-    activeSessionKeyRef.current = newKey;
     dispatchRef.current({ type: "NEW_SESSION", session: record });
+    activeSessionKeyRef.current = newKey;
     saveActiveSessionKey(newKey);
   }, []);
 
@@ -428,15 +428,23 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
     bubbleAccumRef.current.clear();
     seenStartsRef.current.clear();
-    activeSessionKeyRef.current = sessionKey;
     saveActiveSessionKey(sessionKey);
 
-    const client = clientRef.current;
-    const messages = client ? await loadSessionPreview(client, sessionKey) : [];
+    // Dispatch first to update Redux, then sync ref — single source of truth
+    dispatchRef.current({ type: "SWITCH_SESSION", sessionKey });
+    activeSessionKeyRef.current = sessionKey;
 
+    const client = clientRef.current;
+    let messages: Awaited<ReturnType<typeof loadSessionPreview>> = [];
+    try {
+      messages = client ? await loadSessionPreview(client, sessionKey) : [];
+    } catch (err) {
+      console.error("[Store] loadSessionPreview failed:", err);
+    }
+
+    // Guard: user may have switched again while we were loading
     if (activeSessionKeyRef.current !== sessionKey) return;
     dispatchRef.current({ type: "HYDRATE_SESSION_CHAT", sessionKey, chatMessages: messages });
-    dispatchRef.current({ type: "SWITCH_SESSION", sessionKey });
   }, []);
 
   return React.createElement(

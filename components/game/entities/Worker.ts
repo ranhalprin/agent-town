@@ -193,6 +193,7 @@ export class Worker implements WorkerCtx {
 
   hideEmote() {
     if (!this.emoteSprite) return;
+    this.emoteSprite.removeAllListeners("animationcomplete");
     this.emoteSprite.setVisible(false);
     this.emoteSprite.stop();
     this.currentEmoteKey = null;
@@ -383,6 +384,7 @@ export class Worker implements WorkerCtx {
 
   destroy() {
     if (this.initTimer) { this.initTimer.destroy(); this.initTimer = null; }
+    this.interactionLocked = false;
     this.stopIdleActivity();
     if (this.taskVisualTimer) { this.taskVisualTimer.destroy(); this.taskVisualTimer = null; }
     if (this.emoteSprite) { this.emoteSprite.removeAllListeners(); this.emoteSprite.destroy(); this.emoteSprite = null; }

@@ -193,6 +193,13 @@ export class OfficeScene extends Phaser.Scene {
 
   // ── Workers ──────────────────────────────────────────────
 
+  private cleanupWorkerRunIds(worker: Worker) {
+    if (worker.assignedRunId) this.runWorkerMap.delete(worker.assignedRunId);
+    for (const task of worker.taskQueue) {
+      this.runWorkerMap.delete(task.runId);
+    }
+  }
+
   private spawnWorker(seatDef: SeatDef, seat: SeatState) {
     if (!seat.spriteKey) return null;
     const initialFacing: Direction = seat.spriteKey === "character_06" ? "right" : seatDef.facing;
@@ -226,7 +233,7 @@ export class OfficeScene extends Phaser.Scene {
 
       if (!seat) {
         if (existing) {
-          if (existing.assignedRunId) this.runWorkerMap.delete(existing.assignedRunId);
+          this.cleanupWorkerRunIds(existing);
           if (this.nearestWorker === existing) this.nearestWorker = null;
           existing.destroy();
           existingBySeatId.delete(seatDef.seatId);
@@ -241,7 +248,7 @@ export class OfficeScene extends Phaser.Scene {
 
       if (needsRecreate) {
         if (existing) {
-          if (existing.assignedRunId) this.runWorkerMap.delete(existing.assignedRunId);
+          this.cleanupWorkerRunIds(existing);
           if (this.nearestWorker === existing) this.nearestWorker = null;
           existing.destroy();
           existingBySeatId.delete(seatDef.seatId);
@@ -256,7 +263,7 @@ export class OfficeScene extends Phaser.Scene {
     }
 
     for (const stale of existingBySeatId.values()) {
-      if (stale.assignedRunId) this.runWorkerMap.delete(stale.assignedRunId);
+      this.cleanupWorkerRunIds(stale);
       if (this.nearestWorker === stale) this.nearestWorker = null;
       stale.destroy();
     }
@@ -276,6 +283,7 @@ export class OfficeScene extends Phaser.Scene {
     this.interactionMenu = new InteractionMenu(this);
     this.interactionMenu.onClose = () => {
       this.menuOpen = false;
+      this.resumeCameraFollow();
     };
   }
 

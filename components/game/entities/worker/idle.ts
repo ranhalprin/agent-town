@@ -54,6 +54,7 @@ export function scheduleWander(ctx: WorkerCtx) {
   if (!ctx.canWander || ctx._status !== "idle") return;
 
   const delay = Phaser.Math.Between(WANDER_MIN_DELAY, WANDER_MAX_DELAY);
+  if (ctx.wanderTimer) ctx.wanderTimer.destroy();
   ctx.wanderTimer = ctx.scene.time.delayedCall(delay, () => {
     tryStartWander(ctx);
   });
@@ -66,6 +67,7 @@ function tryStartWander(ctx: WorkerCtx) {
   const sinceLast = now - wanderClock.lastStartedAt;
   if (sinceLast < WANDER_STAGGER_MS) {
     const extraDelay = WANDER_STAGGER_MS - sinceLast + Phaser.Math.Between(STAGGER_EXTRA_MIN, STAGGER_EXTRA_MAX);
+    if (ctx.wanderTimer) ctx.wanderTimer.destroy();
     ctx.wanderTimer = ctx.scene.time.delayedCall(extraDelay, () => {
       tryStartWander(ctx);
     });

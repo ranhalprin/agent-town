@@ -126,6 +126,7 @@ export class GatewayClient {
 
       ws.onerror = () => {
         this.setStatus("error");
+        this.clearPending();
         this.rejectConnect(new Error("WebSocket connection error"));
       };
 
@@ -209,12 +210,11 @@ export class GatewayClient {
         clearTimeout(pending.timer);
         this.pending.delete(frame.id);
 
-        if (frame.ok && frame.payload?.type === "hello-ok") {
-          this.setStatus("connected");
-          onConnected?.(frame);
-        }
-
         if (frame.ok) {
+          if (frame.payload?.type === "hello-ok") {
+            this.setStatus("connected");
+            onConnected?.(frame);
+          }
           pending.resolve(frame);
         } else {
           pending.reject(

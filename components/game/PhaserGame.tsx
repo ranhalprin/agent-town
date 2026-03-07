@@ -25,7 +25,9 @@ export default function PhaserGame() {
       gameRef.current = game;
     }
 
-    initGame();
+    initGame().catch((err) => {
+      console.error("[PhaserGame] init failed:", err);
+    });
 
     return () => {
       mounted = false;

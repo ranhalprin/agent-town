@@ -36,7 +36,13 @@ class GameEventBus {
   }
 
   emit<K extends keyof GameEventMap>(event: K, ...args: GameEventMap[K]) {
-    this.listeners.get(event)?.forEach((fn) => fn(...args));
+    this.listeners.get(event)?.forEach((fn) => {
+      try {
+        fn(...args);
+      } catch (err) {
+        console.error(`[GameEventBus] listener error on "${event}":`, err);
+      }
+    });
   }
 }
 

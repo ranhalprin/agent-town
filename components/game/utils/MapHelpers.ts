@@ -50,7 +50,10 @@ export function parseSpawns(map: Phaser.Tilemaps.Tilemap) {
   let bossObj = spawnsLayer.objects.find((o) => o.name === "boss");
   if (!bossObj) {
     const sorted = [...spawnsLayer.objects].sort((a, b) => a.x! - b.x!);
-    bossObj = sorted.pop()!;
+    bossObj = sorted.pop();
+    if (!bossObj) {
+      return { bossSpawn: fallback, workerSpawns: [] as SeatDef[] };
+    }
   }
 
   const bossSpawn = { x: bossObj.x!, y: bossObj.y! };

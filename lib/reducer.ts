@@ -194,23 +194,27 @@ export function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
       const msgs = [...state.chatMessages];
       let idx = -1;
       for (let i = msgs.length - 1; i >= 0; i--) {
-        if (msgs[i].runId === action.runId && msgs[i].role === "assistant") {
+        const m = msgs[i];
+        if (m.runId === action.runId && m.role === "assistant") {
           idx = i;
           break;
         }
       }
       if (idx >= 0) {
-        msgs[idx] = {
-          ...msgs[idx],
-          content: msgs[idx].content + action.delta,
-          actorName: msgs[idx].actorName ?? action.actorName,
-          streaming: true,
-        };
+        const existing = msgs[idx];
+        if (existing.role !== "tool") {
+          msgs[idx] = {
+            ...existing,
+            content: existing.content + action.delta,
+            actorName: existing.actorName ?? action.actorName,
+            streaming: true,
+          };
+        }
       } else {
         msgs.push({
           id: chatId(),
           runId: action.runId,
-          role: "assistant",
+          role: "assistant" as const,
           content: action.delta,
           timestamp: new Date().toISOString(),
           sessionKey: findTask(state.tasks, action.runId)?.sessionKey ?? MAIN_SESSION_KEY,
@@ -225,23 +229,27 @@ export function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
       const all = [...state.chatMessages];
       let fi = -1;
       for (let i = all.length - 1; i >= 0; i--) {
-        if (all[i].runId === action.runId && all[i].role === "assistant") {
+        const m = all[i];
+        if (m.runId === action.runId && m.role === "assistant") {
           fi = i;
           break;
         }
       }
       if (fi >= 0) {
-        all[fi] = {
-          ...all[fi],
-          content: action.content,
-          actorName: all[fi].actorName ?? action.actorName,
-          streaming: false,
-        };
+        const existing = all[fi];
+        if (existing.role !== "tool") {
+          all[fi] = {
+            ...existing,
+            content: action.content,
+            actorName: existing.actorName ?? action.actorName,
+            streaming: false,
+          };
+        }
       } else {
         all.push({
           id: chatId(),
           runId: action.runId,
-          role: "assistant",
+          role: "assistant" as const,
           content: action.content,
           timestamp: new Date().toISOString(),
           sessionKey: findTask(state.tasks, action.runId)?.sessionKey ?? MAIN_SESSION_KEY,

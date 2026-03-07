@@ -55,6 +55,12 @@ export default function SeatManagerModal({
   );
 
   useEffect(() => {
+    if (open && seats.length > 0 && !seats.find((s) => s.seatId === selectedSeatId)) {
+      setSelectedSeatId(seats[0].seatId);
+    }
+  }, [open, seats, selectedSeatId]);
+
+  useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
