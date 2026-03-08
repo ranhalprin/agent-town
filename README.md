@@ -4,7 +4,7 @@
 
 ### A playable world where AI agents live, work, and collaborate
 
-Your agents deserve more than a terminal. Give them an office, a town, and eventually — a world.
+Your agents deserve more than a terminal. Give them an office, a town, and eventually, a world.
 
 [![npm version](https://img.shields.io/npm/v/@geezerrrr/agent-town?color=cb0303&label=npm)](https://www.npmjs.com/package/@geezerrrr/agent-town)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
@@ -23,13 +23,13 @@ Your agents deserve more than a terminal. Give them an office, a town, and event
 
 ## What is this?
 
-Agent Town is a pixel RPG built on top of [OpenClaw](https://github.com/openclaw/openclaw). You walk around an office as the boss, assign tasks face-to-face, and watch your AI agents work in real time — not in a log, but in the room.
+Agent Town is a pixel RPG built on top of [OpenClaw](https://github.com/openclaw/openclaw). You walk around an office as the boss, assign tasks face-to-face, and watch your AI agents work in real time. Not in a log, but in the room.
 
 Today it's a local office. The goal is a shared online world: agents from different users collaborating across the network, a skill marketplace, a task delegation economy, and spatial UX for everything OpenClaw can do.
 
 ## Quick Start
 
-Run instantly with npx — no clone, no install:
+Run instantly with npx, no clone, no install:
 
 ```bash
 npx @geezerrrr/agent-town
@@ -56,13 +56,10 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Key features
 
-**In-world task assignment** — Approach any worker and assign tasks through an RPG-style interaction menu. No forms, no dropdowns. You walk up and talk.
-
-**Visible execution** — Tasks move through `queued > returning > sending > running > done/failed`. Worker bubbles show what's happening at each step. Tool calls are collapsible in the chat panel.
-
-**Worker autonomy** — Idle workers roam the office: whiteboards, printers, sofas, bookshelves. They return to their seat before starting real work. Busy workers queue additional tasks.
-
-**Session management** — Multiple sessions with quick switching, token/context metering, and a seat manager for configuring worker names, roles, and sprites.
+- **In-world task assignment:** Approach any worker and assign tasks through an RPG-style interaction menu. No forms, no dropdowns. You walk up and talk.
+- **Visible execution:** Tasks move through `queued > returning > sending > running > done/failed`. Worker bubbles show what's happening at each step. Tool calls are collapsible in the chat panel.
+- **Worker autonomy:** Idle workers roam the office: whiteboards, printers, sofas, bookshelves. They return to their seat before starting real work. Busy workers queue additional tasks.
+- **Session management:** Multiple sessions with quick switching, token/context metering, and a seat manager for configuring worker names, roles, and sprites.
 
 ## How it works
 
@@ -99,18 +96,18 @@ flowchart LR
     Connector -->|local WS| GW
 ```
 
-- **Game UI** — Phaser office + React HUD. Talks only to the backend.
-- **Backend** — Runs locally for dev, cloud for prod. Same code, same protocol.
-- **Connector** — Standalone process on the user's machine. Bridges private OpenClaw to the backend. OpenClaw credentials never leave the local machine.
+- **Game UI:** Phaser office + React HUD. Talks only to the backend.
+- **Backend:** Runs locally for dev, cloud for prod. Same code, same protocol.
+- **Connector:** Standalone process on the user's machine. Bridges private OpenClaw to the backend. OpenClaw credentials never leave the local machine.
 
 ## Roadmap
 
-- **Backend + Connector** — decouple the game UI from OpenClaw; standalone connector bridges private gateways to a shared backend
-- **Cloud deployment** — log into `cloud.agent.town` and operate your own OpenClaw through the cloud world UI
-- **Shared world** — multi-user presence, social interactions, cooperative rooms with opt-in projections
-- **Library scene** — long-term memory as a walkable space (shelves, archives, research stations)
-- **Workshop scene** — skill and tool management as physical stations in the world
-- **Town map + marketplace** — expand beyond the office; acquire third-party skills, delegate tasks to external agents
+- **Backend + Connector:** Decouple the game UI from OpenClaw; standalone connector bridges private gateways to a shared backend
+- **Cloud deployment:** Log into `cloud.agent.town` and operate your own OpenClaw through the cloud world UI
+- **Shared world:** Multi-user presence, social interactions, cooperative rooms with opt-in projections
+- **Library scene:** Long-term memory as a walkable space (shelves, archives, research stations)
+- **Workshop scene:** Skill and tool management as physical stations in the world
+- **Town map + marketplace:** Expand beyond the office; acquire third-party skills, delegate tasks to external agents
 
 ## Assets
 
