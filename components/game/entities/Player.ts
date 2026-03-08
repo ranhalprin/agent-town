@@ -14,21 +14,21 @@ export class Player {
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd: Record<string, Phaser.Input.Keyboard.Key>;
   private facing: Direction = "left";
+  private arrow: Phaser.GameObjects.Sprite | null = null;
+  private hasMovedOnce = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    // Create animations once
     this.createAnimations(scene);
 
-    // Create physics sprite
     this.sprite = scene.physics.add.sprite(x, y, SPRITE_KEY, 0);
     this.sprite.setDepth(5);
 
-    // Physics body covers the feet area (bottom portion of the 48×96 frame)
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
     body.setSize(FRAME_WIDTH * 0.5, FRAME_HEIGHT * 0.2);
     body.setOffset(FRAME_WIDTH * 0.25, FRAME_HEIGHT * 0.75);
 
-    // Keyboard input
+    this.initArrow(scene, x, y);
+
     const kb = scene.input.keyboard;
     if (!kb) throw new Error("Keyboard plugin not available");
     this.cursors = kb.createCursorKeys();
@@ -39,8 +39,26 @@ export class Player {
       D: Phaser.Input.Keyboard.KeyCodes.D,
     }) as Record<string, Phaser.Input.Keyboard.Key>;
 
-    // Start idle
     this.sprite.anims.play("idle-left");
+  }
+
+  private initArrow(scene: Phaser.Scene, x: number, y: number) {
+    if (!scene.textures.exists("boss-arrow")) return;
+
+    if (!scene.anims.exists("boss-arrow-bounce")) {
+      scene.anims.create({
+        key: "boss-arrow-bounce",
+        frames: scene.anims.generateFrameNumbers("boss-arrow", { start: 0, end: 5 }),
+        frameRate: 6,
+        repeat: -1,
+      });
+    }
+
+    const headY = y - FRAME_HEIGHT * 0.5;
+    this.arrow = scene.add.sprite(x, headY, "boss-arrow", 0);
+    this.arrow.setDepth(25);
+    this.arrow.setTint(0xffd700);
+    this.arrow.play("boss-arrow-bounce");
   }
 
   private createAnimations(scene: Phaser.Scene) {
@@ -88,8 +106,17 @@ export class Player {
 
     body.setVelocity(vx, vy);
 
-    // Determine facing direction and animation
     const moving = vx !== 0 || vy !== 0;
+
+    if (!this.hasMovedOnce && moving && this.arrow) {
+      this.hasMovedOnce = true;
+      this.arrow.destroy();
+      this.arrow = null;
+    }
+
+    if (this.arrow) {
+      this.arrow.setPosition(this.sprite.x, this.sprite.y - FRAME_HEIGHT * 0.5);
+    }
 
     if (moving) {
       // Prefer horizontal when diagonal

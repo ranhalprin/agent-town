@@ -79,6 +79,11 @@ export class OfficeScene extends Phaser.Scene {
       frameWidth: EMOTE_FRAME_SIZE,
       frameHeight: EMOTE_FRAME_SIZE,
     });
+
+    this.load.spritesheet("boss-arrow", "/sprites/arrow_down_48x48.png", {
+      frameWidth: 48,
+      frameHeight: 48,
+    });
   }
 
   create() {
