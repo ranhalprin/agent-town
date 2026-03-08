@@ -12,6 +12,7 @@ Your agents deserve more than a terminal. Give them an office, a town, and event
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![Phaser](https://img.shields.io/badge/Phaser-3-8B44AC)](https://phaser.io/)
+[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/9nTtN3ShP8)
 
 </div>
 
