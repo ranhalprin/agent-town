@@ -16,12 +16,13 @@ export default function WorkerPanel({
   seats: SeatState[];
   onOpenManager: () => void;
 }) {
-  const active = seats.filter((seat) => seat.status === "running" || seat.status === "returning").length;
+  const assigned = seats.filter((s) => s.assigned).length;
+  const working = seats.filter((s) => s.assigned && (s.status === "running" || s.status === "returning")).length;
 
   return (
     <HudFlyout
       title="Employees"
-      subtitle={`${active}/${seats.length} currently busy`}
+      subtitle={`${working}/${assigned} busy · ${assigned}/${seats.length} seat`}
       headerAction={
         <button
           type="button"

@@ -19,7 +19,7 @@ export function assignTask(ctx: WorkerCtx, runId: string, taskMessage: string, o
       ctx.taskVisualTimer = null;
     }
     ctx.taskVisualTimer = ctx.scene.time.delayedCall(TASK_THINK_DELAY_MS, () => {
-      if (ctx._status === "working") ctx.showEmote("emote:thinking");
+      if (ctx._status === "working") ctx.showEmote("emote:dots");
       ctx.taskVisualTimer = null;
     });
   };

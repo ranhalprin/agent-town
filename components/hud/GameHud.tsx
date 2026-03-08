@@ -44,15 +44,10 @@ export default function GameHud() {
     [],
   );
 
-  const runningCount = visibleTasks.filter(
-    (task) =>
-      task.status === "running" ||
-      task.status === "submitted" ||
-      task.status === "queued" ||
-      task.status === "returning",
-  ).length;
-  const activeWorkers = state.seats.filter(
-    (seat) => seat.status === "running" || seat.status === "returning",
+  const totalSeats = state.seats.length;
+  const assignedSeats = state.seats.filter((s) => s.assigned).length;
+  const workingCount = state.seats.filter(
+    (s) => s.assigned && (s.status === "running" || s.status === "returning"),
   ).length;
 
   const togglePanel = useCallback((id: HudPanelId) => {
@@ -96,14 +91,12 @@ export default function GameHud() {
 
         <div className="hud-status-cluster__row">
           <div className="hud-pill hud-pill--metric">
-            <Sparkles size={12} />
-            <span>{runningCount} running</span>
+            <Users size={12} />
+            <span>{assignedSeats}/{totalSeats} seat</span>
           </div>
           <div className="hud-pill hud-pill--metric">
-            <Users size={12} />
-            <span>
-              {activeWorkers}/{state.seats.length} busy
-            </span>
+            <Sparkles size={12} />
+            <span>{workingCount}/{assignedSeats} busy</span>
           </div>
         </div>
       </div>

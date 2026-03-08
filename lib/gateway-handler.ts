@@ -362,6 +362,7 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
       }
       const content = p.message?.content;
       const text = content?.find((c) => c.type === "text")?.text;
+      dispatch()({ type: "SET_SEAT_STATUS", runId, status: "done" });
       dispatch()({
         type: "UPDATE_TASK", taskId: runId,
         patch: { status: "completed", completedAt: new Date().toISOString(), result: text },
@@ -406,6 +407,7 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
 
     const status = f.payload?.status as string | undefined;
     if (f.ok && (status === "ok" || status === "completed")) {
+      dispatch()({ type: "SET_SEAT_STATUS", runId, status: "done" });
       dispatch()({
         type: "UPDATE_TASK", taskId: runId,
         patch: { status: "completed", completedAt: new Date().toISOString() },

@@ -10,7 +10,7 @@
  *   Row 6: gold, -, gray ?, star, music note, frame
  *   Row 7: cat/angry, red sword, wrench, music
  *   Row 8: person, medal, moon, sun/coin
- *   Row 9: ban, pattern, X, water drop
+ *   Row 9: ban, dots "...", striped, water drop
  *
  * Each icon occupies 2 consecutive frames (normal + alt for animation).
  */
@@ -40,4 +40,6 @@ export const EMOTE_ANIMS: EmoteDef[] = [
   { key: "emote:confused",  frames: [62, 63], frameRate: 2,  repeat: -1 },
   { key: "emote:angry",    frames: [70, 71], frameRate: 3,  repeat: 3  },
   { key: "emote:wrench",   frames: [74, 75], frameRate: 2,  repeat: -1 },
+  { key: "emote:device",   frames: [58, 59], frameRate: 2,  repeat: -1 },
+  { key: "emote:dots",     frames: [92, 93], frameRate: 2,  repeat: -1 },
 ];
