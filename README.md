@@ -2,9 +2,16 @@
 
 # Agent Town
 
-### A pixel office where AI agents actually work
+### A playable world where AI agents live, work, and collaborate
 
-Walk around a shared office, talk to your team, assign tasks face-to-face, and watch the work happen — not in a log, but in the room.
+Your agents deserve more than a terminal. Give them an office, a town, and eventually — a world.
+
+[![npm version](https://img.shields.io/npm/v/@geezerrrr/agent-town?color=cb0303&label=npm)](https://www.npmjs.com/package/@geezerrrr/agent-town)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18-green)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
+[![Phaser](https://img.shields.io/badge/Phaser-3-8B44AC)](https://phaser.io/)
 
 </div>
 
@@ -16,9 +23,37 @@ Walk around a shared office, talk to your team, assign tasks face-to-face, and w
 
 ## What is this?
 
-Agent Town turns AI agent orchestration into a playable pixel office. Instead of dashboards and task queues, your agents sit at desks, roam to the whiteboard, grab coffee, and visibly work through whatever you throw at them.
+Agent Town is a pixel RPG built on top of [OpenClaw](https://github.com/openclaw/openclaw). You walk around an office as the boss, assign tasks face-to-face, and watch your AI agents work in real time — not in a log, but in the room.
 
-You play the boss. Walk up to a worker, press `E`, give them a job. If they're away from their desk, they walk back first. If they're already busy, the task queues up. Everything — sending, running, tool calls, completion — plays out on screen.
+Today it's a local office. The goal is a shared online world: agents from different users collaborating across the network, a skill marketplace, a task delegation economy, and spatial UX for everything OpenClaw can do.
+
+## Quick Start
+
+Run instantly with npx — no clone, no install:
+
+```bash
+npx @geezerrrr/agent-town
+```
+
+Options:
+
+```bash
+npx @geezerrrr/agent-town --port 8080
+npx @geezerrrr/agent-town --gateway ws://192.168.1.100:18789/
+```
+
+Open [http://localhost:3000](http://localhost:3000) (or your custom port). You'll need an [OpenClaw](https://github.com/openclaw/openclaw) gateway running for live agent execution.
+
+## Development Setup
+
+```bash
+git clone git@github.com:geezerrrr/agent-town.git
+cd agent-town
+pnpm install
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
 
 ## Key features
 
@@ -46,49 +81,46 @@ You approach a worker -> Press E -> Assign a task
 | --- | --- |
 | App | Next.js 16, React 19, TypeScript |
 | Game | Phaser 3, Tiled maps, pixel sprite sheets |
-| Gateway | [OpenClaw](https://github.com/anthropics/openclaw) via WebSocket proxy |
+| Agent runtime | [OpenClaw](https://github.com/openclaw/openclaw) via standalone connector |
 | State | React context + reducer + typed event bus |
 
 ## Architecture
 
+Currently the game connects directly to an OpenClaw gateway via WebSocket proxy. The target architecture introduces a backend and standalone connector so that the game UI never talks to OpenClaw directly:
+
 ```mermaid
 flowchart LR
-    Player[Boss Avatar]
-    HUD[HUD + Chat]
-    Scene[Phaser Office]
-    Workers[Workers]
-    Store[Store + Events]
-    GW[Gateway Client]
-    OC[OpenClaw Gateway]
+    UI[Game UI]
+    Backend[Agent Town Backend]
+    Connector[Connector]
+    GW[OpenClaw Gateway]
 
-    Player --> Scene --> Workers --> Store
-    Player --> HUD --> Store
-    Store --> GW --> OC --> GW --> Store
-    Store --> Scene
-    Store --> HUD
+    UI -->|WSS| Backend
+    Connector -->|outbound WSS| Backend
+    Connector -->|local WS| GW
 ```
 
-## Getting started
+- **Game UI** — Phaser office + React HUD. Talks only to the backend.
+- **Backend** — Runs locally for dev, cloud for prod. Same code, same protocol.
+- **Connector** — Standalone process on the user's machine. Bridges private OpenClaw to the backend. OpenClaw credentials never leave the local machine.
 
-```bash
-pnpm install
-pnpm dev
-```
+## Roadmap
 
-Open [http://localhost:3000](http://localhost:3000). You'll need an [OpenClaw](https://github.com/anthropics/openclaw) gateway running for live agent execution.
+- **Backend + Connector** — decouple the game UI from OpenClaw; standalone connector bridges private gateways to a shared backend
+- **Cloud deployment** — log into `cloud.agent.town` and operate your own OpenClaw through the cloud world UI
+- **Shared world** — multi-user presence, social interactions, cooperative rooms with opt-in projections
+- **Library scene** — long-term memory as a walkable space (shelves, archives, research stations)
+- **Workshop scene** — skill and tool management as physical stations in the world
+- **Town map + marketplace** — expand beyond the office; acquire third-party skills, delegate tasks to external agents
 
 ## Assets
 
 The office scene uses pixel tilesets and sprite sheets authored in Tiled. If running outside the original setup, provide your own compatible assets under `public/`.
 
-## Roadmap
-
-- **Library scene** — long-term memory as a walkable space (shelves, archives, research stations)
-- **Workshop scene** — skill and tool management as physical stations in the world
-- **Town map + marketplace** — expand beyond the office; acquire third-party skills, delegate tasks to external agents
-- Richer worker personalities and schedules
-- Better onboarding for first-time players
-
 ## Contributing
 
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md). We're especially looking for people interested in gameplay design, scene/level design, and game-native UX for AI workflows.
+
+## License
+
+[MIT](./LICENSE)
