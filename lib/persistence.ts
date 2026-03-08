@@ -18,6 +18,8 @@ import {
   LS_SESSIONS,
   LS_ACTIVE_KEY,
   LS_SEAT_CONFIG,
+  LS_BGM_VOLUME,
+  DEFAULT_BGM_VOLUME,
   MAX_SESSIONS,
 } from "./constants";
 
@@ -104,4 +106,12 @@ export function loadSeatConfigs(): PersistedSeatConfig[] {
 
 export function saveSeatConfigs(configs: PersistedSeatConfig[]) {
   lsSet(LS_SEAT_CONFIG, configs);
+}
+
+export function loadBgmVolume(): number {
+  return lsGet<number>(LS_BGM_VOLUME, DEFAULT_BGM_VOLUME);
+}
+
+export function saveBgmVolume(volume: number) {
+  lsSet(LS_BGM_VOLUME, volume);
 }

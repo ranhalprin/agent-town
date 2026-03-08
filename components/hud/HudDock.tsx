@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 
-export type HudPanelId = "connection" | "chat" | "tasks" | "workers";
+export type HudPanelId = "connection" | "chat" | "tasks" | "workers" | "music";
 
 export interface HudDockItem {
   id: HudPanelId;
@@ -15,13 +15,16 @@ interface HudDockProps {
   items: HudDockItem[];
   openPanel: HudPanelId | null;
   onToggle: (id: HudPanelId) => void;
+  iconOverrides?: Partial<Record<HudPanelId, string>>;
 }
 
-export default function HudDock({ items, openPanel, onToggle }: HudDockProps) {
+export default function HudDock({ items, openPanel, onToggle, iconOverrides }: HudDockProps) {
   return (
     <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 4 }}>
       {items.map((item) => {
         const active = openPanel === item.id;
+        const override = iconOverrides?.[item.id];
+        const src = override ?? (active ? item.iconActive : item.icon);
         return (
           <button
             key={item.id}
@@ -42,7 +45,7 @@ export default function HudDock({ items, openPanel, onToggle }: HudDockProps) {
             }}
           >
             <Image
-              src={active ? item.iconActive : item.icon}
+              src={src}
               alt={item.label}
               width={42}
               height={42}

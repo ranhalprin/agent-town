@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ComponentProps } from "react";
 import { Sparkles, Users } from "lucide-react";
 import { useStudio } from "@/lib/store";
 import { STATUS_LABELS, formatModelLabel, isVisibleChatMessage } from "@/lib/constants";
 import { MAIN_SESSION_KEY } from "@/lib/reducer";
+import { useBgm } from "@/lib/useBgm";
 import ContextMeter from "./ContextMeter";
 import HudDock, { type HudDockItem, type HudPanelId } from "./HudDock";
 import ConnectionPanel from "./ConnectionPanel";
@@ -12,9 +13,11 @@ import ChatPanel from "./ChatPanel";
 import TaskPanel from "./TaskPanel";
 import WorkerPanel from "./WorkerPanel";
 import SeatManagerModal from "./SeatManagerModal";
+import MusicControls from "./MusicControls";
 
 export default function GameHud() {
   const { state } = useStudio();
+  const bgm = useBgm();
   const [openPanel, setOpenPanel] = useState<HudPanelId | null>(null);
   const [seatManagerOpen, setSeatManagerOpen] = useState(false);
   const activeSessionKey = state.activeSessionKey ?? MAIN_SESSION_KEY;
@@ -32,6 +35,7 @@ export default function GameHud() {
 
   const dockItems: HudDockItem[] = useMemo(
     () => [
+      { id: "music", label: "Music", icon: "/ui/icons/icon-music.png", iconActive: "/ui/icons/icon-music-active.png" },
       { id: "connection", label: "Connection", icon: "/ui/icons/icon-connection.png", iconActive: "/ui/icons/icon-connection-active.png" },
       { id: "chat", label: "Chat", icon: "/ui/icons/icon-chat.png", iconActive: "/ui/icons/icon-chat-active.png" },
       { id: "tasks", label: "Tasks", icon: "/ui/icons/icon-tasks.png", iconActive: "/ui/icons/icon-tasks-active.png" },
@@ -54,6 +58,11 @@ export default function GameHud() {
   const togglePanel = useCallback((id: HudPanelId) => {
     setOpenPanel((current) => (current === id ? null : id));
   }, []);
+
+  const musicIconOverrides: ComponentProps<typeof HudDock>["iconOverrides"] = useMemo(
+    () => (bgm.volume <= 0 ? { music: "/ui/icons/icon-music-muted.png" } : undefined),
+    [bgm.volume],
+  );
 
   return (
     <div className="hud-overlay">
@@ -100,7 +109,8 @@ export default function GameHud() {
       </div>
 
       <div className="hud-dock-container">
-        {openPanel ? (
+        {openPanel === "music" ? <MusicControls bgm={bgm} /> : null}
+        {openPanel && openPanel !== "music" ? (
           <div className="hud-dock-container__panel">
             {openPanel === "connection" ? <ConnectionPanel /> : null}
             {openPanel === "chat" ? (
@@ -119,7 +129,12 @@ export default function GameHud() {
           </div>
         ) : null}
         <div className="hud-dock-container__dock">
-          <HudDock items={dockItems} openPanel={openPanel} onToggle={togglePanel} />
+          <HudDock
+            items={dockItems}
+            openPanel={openPanel}
+            onToggle={togglePanel}
+            iconOverrides={musicIconOverrides}
+          />
         </div>
       </div>
       <SeatManagerModal

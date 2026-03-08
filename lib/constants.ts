@@ -60,6 +60,10 @@ export const LS_CHAT = "agent-town:chat";
 export const LS_SESSIONS = "agent-town:sessions";
 export const LS_ACTIVE_KEY = "agent-town:active-session-key";
 export const LS_SEAT_CONFIG = "agent-town:seat-config";
+export const LS_BGM_VOLUME = "agent-town:bgm-volume";
+
+// ── Audio ────────────────────────────────────────────────
+export const DEFAULT_BGM_VOLUME = 0.45;
 
 // ── Limits ───────────────────────────────────────────────
 export const MAX_CHAT = 500;
