@@ -35,14 +35,13 @@ Run instantly with npx — no clone, no install:
 npx @geezerrrr/agent-town
 ```
 
-Options:
+Open [http://localhost:3000](http://localhost:3000). You'll need an [OpenClaw](https://github.com/openclaw/openclaw) gateway running for live agent execution.
+
+Custom port or gateway:
 
 ```bash
-npx @geezerrrr/agent-town --port 8080
-npx @geezerrrr/agent-town --gateway ws://192.168.1.100:18789/
+npx @geezerrrr/agent-town --port 3000 --gateway ws://127.0.0.1:18789/
 ```
-
-Open [http://localhost:3000](http://localhost:3000) (or your custom port). You'll need an [OpenClaw](https://github.com/openclaw/openclaw) gateway running for live agent execution.
 
 ## Development Setup
 
