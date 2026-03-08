@@ -94,7 +94,7 @@ export class InteractionMenu {
       this.container.add(highlight);
 
       const txt = this.scene.add.text(PAD_X, y + 4, opt.label, {
-        fontFamily: '"Press Start 2P", "Zpix", monospace',
+        fontFamily: '"Press Start 2P", "ArkPixel", monospace',
         fontSize: FONT_SIZE,
         color: opt.enabled ? TEXT_COLOR : DISABLED_COLOR,
       });

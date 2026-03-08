@@ -1,9 +1,8 @@
 @import "tailwindcss";
 
-/* Force a fresh font family + fresh filename to bypass cache/config issues. */
 @font-face {
-  font-family: "Zpix20260307";
-  src: url("/fonts/zpix-20260307.ttf") format("truetype");
+  font-family: "ArkPixel";
+  src: url("/fonts/ark-pixel-12px.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -21,8 +20,8 @@
   --pixel-red: #ef4444;
   --pixel-text: #e2e8f0;
   --pixel-muted: #94a3b8;
-  --pixel-font: var(--font-pixel), "Zpix20260307", monospace;
-  --pixel-font-chat: "Zpix20260307", monospace;
+  --pixel-font: var(--font-pixel), "ArkPixel", monospace;
+  --pixel-font-chat: "ArkPixel", monospace;
 }
 
 img,
@@ -70,7 +69,7 @@ canvas {
 }
 
 .pixel-input {
-  font-family: "Zpix20260307", monospace;
+  font-family: "ArkPixel", monospace;
   font-size: 12px;
   padding: 8px 12px;
   border: 3px solid var(--pixel-border);
@@ -82,10 +81,11 @@ canvas {
   -webkit-font-smoothing: none;
   font-smooth: never;
   text-rendering: optimizeSpeed;
+  text-shadow: 0.5px 0 0 currentColor;
 }
 
 .pixel-input::placeholder {
-  font-family: "Zpix20260307", monospace;
+  font-family: "ArkPixel", monospace;
   font-size: 12px;
   -webkit-font-smoothing: none;
   font-smooth: never;
@@ -406,14 +406,15 @@ canvas {
 .hud-chat__system {
   border: 2px solid rgba(255,255,255,0.08);
   padding: 10px 12px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.85;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: "Zpix20260307", monospace;
+  font-family: "ArkPixel", monospace;
   text-rendering: optimizeSpeed;
   -webkit-font-smoothing: none;
   font-smooth: never;
+  text-shadow: 0.5px 0 0 currentColor;
 }
 
 .hud-chat__bubble--user {
@@ -441,10 +442,12 @@ canvas {
 
 .hud-chat__tool-output {
   margin-top: 8px;
+  font-size: 12px;
   color: var(--pixel-green);
-  font-family: "Zpix20260307", monospace;
+  font-family: "ArkPixel", monospace;
   -webkit-font-smoothing: none;
   font-smooth: never;
+  text-shadow: 0.5px 0 0 currentColor;
 }
 
 .hud-chat__system {

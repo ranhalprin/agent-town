@@ -7,8 +7,8 @@ const BUBBLE_RADIUS = 6;
 const TAIL_SIZE = 6;
 const FADE_DURATION = 400;
 const DEFAULT_TTL = 5000;
-const BUBBLE_FONT_SIZE = 8;
-const BUBBLE_FONT_FAMILY = '"Zpix20260307", "Zpix", monospace';
+const BUBBLE_FONT_SIZE = 12;
+const BUBBLE_FONT_FAMILY = '"ArkPixel", monospace';
 
 // Shared canvas context for text measurement across all ChatBubble instances
 let sharedMeasureCtx: CanvasRenderingContext2D | null = null;
@@ -37,6 +37,8 @@ export class ChatBubble {
       fontSize: `${BUBBLE_FONT_SIZE}px`,
       color: "#1a1a2e",
       lineSpacing: 6,
+      stroke: "#1a1a2e",
+      strokeThickness: 0.5,
     });
     this.text.setOrigin(0, 0);
 
