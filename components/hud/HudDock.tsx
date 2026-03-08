@@ -29,6 +29,7 @@ export default function HudDock({ items, openPanel, onToggle, iconOverrides }: H
           <button
             key={item.id}
             type="button"
+            data-dock-id={item.id}
             onClick={() => onToggle(item.id)}
             title={item.label}
             style={{

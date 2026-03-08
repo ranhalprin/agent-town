@@ -109,7 +109,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
     configRef.current = cfg;
     modelCatalogRef.current = null;
-    saveGatewayConfig(cfg);
 
     const client = new GatewayClient(cfg.url, cfg.token);
     clientRef.current = client;
@@ -131,8 +130,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
     client
       .connect()
+      .then(() => {
+        saveGatewayConfig(cfg);
+      })
       .catch((err) => {
-        console.error("[Gateway] connect failed:", err);
+        console.warn("[Gateway] connect failed:", err.message);
         dispatchRef.current({ type: "SET_CONNECTION", status: "error" });
         dispatchRef.current({
           type: "APPEND_CHAT",

@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useStudio } from "@/lib/store";
 import { LS_CONFIG, STATUS_LABELS } from "@/lib/constants";
-import { getDefaultGatewayUrl } from "@/lib/utils";
+import { parseGatewayAddress } from "@/lib/utils";
 import HudFlyout from "./HudFlyout";
 
-const DEFAULT_URL = getDefaultGatewayUrl();
+const DEFAULT_GATEWAY = "ws://127.0.0.1:18789";
 const DEFAULT_TOKEN = process.env.NEXT_PUBLIC_GATEWAY_TOKEN ?? "";
 
 export default function ConnectionPanel() {
@@ -17,23 +17,29 @@ export default function ConnectionPanel() {
       if (raw) {
         const parsed = JSON.parse(raw) as { url?: string; token?: string };
         return {
-          url: parsed.url || DEFAULT_URL,
+          url: parsed.url || DEFAULT_GATEWAY,
           token: parsed.token || DEFAULT_TOKEN,
         };
       }
     } catch {}
 
-    return { url: DEFAULT_URL, token: DEFAULT_TOKEN };
+    return { url: DEFAULT_GATEWAY, token: DEFAULT_TOKEN };
   });
   const [url, setUrl] = useState(config.url);
   const [token, setToken] = useState(config.token);
   const isConnected = state.connection === "connected";
   const isConnecting = state.connection === "connecting";
 
+  const [error, setError] = useState("");
+
   const handleConnect = () => {
-    const trimmedUrl = url.trim();
-    if (!trimmedUrl) return;
-    connect({ url: trimmedUrl, token: token.trim() });
+    setError("");
+    const parsed = parseGatewayAddress(url);
+    if (!parsed) {
+      setError("Invalid URL. Use ws://host:port or host:port.");
+      return;
+    }
+    connect({ url: parsed, token: token.trim() });
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -51,9 +57,9 @@ export default function ConnectionPanel() {
         <input
           className="pixel-input hud-panel__input"
           value={url}
-          onChange={(event) => setUrl(event.target.value)}
+          onChange={(event) => { setUrl(event.target.value); setError(""); }}
           onKeyDown={handleKeyDown}
-          placeholder={DEFAULT_URL}
+          placeholder="ws://127.0.0.1:18789"
           disabled={isConnected || isConnecting}
         />
         <label className="hud-panel__label">Token</label>
@@ -61,11 +67,14 @@ export default function ConnectionPanel() {
           className="pixel-input hud-panel__input"
           type="password"
           value={token}
-          onChange={(event) => setToken(event.target.value)}
+          onChange={(event) => { setToken(event.target.value); setError(""); }}
           onKeyDown={handleKeyDown}
           placeholder="optional"
           disabled={isConnected || isConnecting}
         />
+        {error && (
+          <p style={{ color: "var(--pixel-red)", fontSize: "8px" }}>{error}</p>
+        )}
         {!isConnected && !isConnecting ? (
           <button
             type="button"
@@ -82,8 +91,8 @@ export default function ConnectionPanel() {
           </button>
         ) : null}
         {isConnecting ? (
-          <button type="button" className="pixel-button" disabled>
-            Connecting...
+          <button type="button" className="pixel-button" onClick={disconnect}>
+            Cancel
           </button>
         ) : null}
       </div>

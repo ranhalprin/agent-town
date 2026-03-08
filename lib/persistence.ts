@@ -19,6 +19,7 @@ import {
   LS_ACTIVE_KEY,
   LS_SEAT_CONFIG,
   LS_BGM_VOLUME,
+  LS_ONBOARDING_DONE,
   DEFAULT_BGM_VOLUME,
   MAX_SESSIONS,
 } from "./constants";
@@ -114,4 +115,12 @@ export function loadBgmVolume(): number {
 
 export function saveBgmVolume(volume: number) {
   lsSet(LS_BGM_VOLUME, volume);
+}
+
+export function loadOnboardingDone(): boolean {
+  return lsGet<boolean>(LS_ONBOARDING_DONE, false);
+}
+
+export function saveOnboardingDone() {
+  lsSet(LS_ONBOARDING_DONE, true);
 }

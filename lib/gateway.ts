@@ -316,6 +316,9 @@ export class GatewayClient {
       this.reconnectTimer = null;
     }
 
+    this.connectSettled = true;
+    this.connectReject = null;
+
     if (this.ws) {
       this.ws.close();
       this.ws = null;

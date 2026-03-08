@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
 import { Sparkles, Users } from "lucide-react";
 import { useStudio } from "@/lib/store";
 import { STATUS_LABELS, formatModelLabel, isVisibleChatMessage } from "@/lib/constants";
 import { MAIN_SESSION_KEY } from "@/lib/reducer";
 import { useBgm } from "@/lib/useBgm";
+import { loadOnboardingDone, loadGatewayConfig, saveOnboardingDone } from "@/lib/persistence";
 import ContextMeter from "./ContextMeter";
 import HudDock, { type HudDockItem, type HudPanelId } from "./HudDock";
 import ConnectionPanel from "./ConnectionPanel";
@@ -14,12 +15,27 @@ import TaskPanel from "./TaskPanel";
 import WorkerPanel from "./WorkerPanel";
 import SeatManagerModal from "./SeatManagerModal";
 import MusicControls from "./MusicControls";
+import OnboardingOverlay from "./OnboardingOverlay";
 
 export default function GameHud() {
   const { state } = useStudio();
   const bgm = useBgm();
   const [openPanel, setOpenPanel] = useState<HudPanelId | null>(null);
   const [seatManagerOpen, setSeatManagerOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (!loadOnboardingDone() && !loadGatewayConfig()) {
+      setShowOnboarding(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showOnboarding && openPanel === "connection") {
+      setShowOnboarding(false);
+      saveOnboardingDone();
+    }
+  }, [showOnboarding, openPanel]);
   const activeSessionKey = state.activeSessionKey ?? MAIN_SESSION_KEY;
   const visibleTasks = useMemo(
     () => state.tasks.filter((task) => task.sessionKey === activeSessionKey),
@@ -60,6 +76,7 @@ export default function GameHud() {
   );
 
   return (
+    <>
     <div className="hud-overlay">
       <div className="hud-status-cluster pixel-panel">
         <div className="hud-status-cluster__row">
@@ -136,5 +153,9 @@ export default function GameHud() {
         seats={state.seats}
       />
     </div>
+    {showOnboarding && (
+      <OnboardingOverlay onDone={() => setShowOnboarding(false)} />
+    )}
+    </>
   );
 }
