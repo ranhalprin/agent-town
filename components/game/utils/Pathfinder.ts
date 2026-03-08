@@ -176,6 +176,9 @@ export class Pathfinder {
 
         const cost = dr !== 0 && dc !== 0 ? 1.414 : 1;
         const g = cur.g + cost;
+        const nkey = nr * this.cols + nc;
+        const prevBest = best.get(nkey);
+        if (prevBest !== undefined && prevBest <= g) continue;
         open.push({ r: nr, c: nc, g, h: this.h(nr, nc, er, ec), parent: cur });
       }
     }
@@ -186,7 +189,11 @@ export class Pathfinder {
   private toCol(x: number) { return Math.floor(x / CELL_SIZE); }
   private toRow(y: number) { return Math.floor(y / CELL_SIZE); }
   private valid(r: number, c: number) { return r >= 0 && r < this.rows && c >= 0 && c < this.cols; }
-  private h(r1: number, c1: number, r2: number, c2: number) { return Math.abs(r1 - r2) + Math.abs(c1 - c2); }
+  private h(r1: number, c1: number, r2: number, c2: number) {
+    const dr = Math.abs(r1 - r2);
+    const dc = Math.abs(c1 - c2);
+    return Math.max(dr, dc) + (Math.SQRT2 - 1) * Math.min(dr, dc);
+  }
 
   private nearestWalkableCell(r: number, c: number): { r: number; c: number } | null {
     for (let d = 1; d <= 12; d++) {

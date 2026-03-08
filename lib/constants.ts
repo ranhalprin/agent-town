@@ -11,7 +11,7 @@ export const BOSS_INTERACT_DISTANCE = 34;
 // ── Pathfinder ───────────────────────────────────────────
 export const PF_CELL_SIZE = 16;
 export const PF_PADDING = 8;
-export const PF_MAX_ITER = 5000;
+export const PF_MAX_ITER = 20000;
 
 // ── Worker wandering ─────────────────────────────────────
 export const WANDER_MIN_DELAY = 3000;
