@@ -33,6 +33,7 @@ import {
   BOSS_PROMPT_OFFSET_Y,
   CAMERA_LERP,
   ZOOM_SENSITIVITY,
+  ZOOM_DEFAULT,
   ZOOM_MIN,
   ZOOM_MAX,
   CAMERA_DRAG_THRESHOLD,
@@ -66,9 +67,17 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.tilemapTiledJSON("office", "/maps/office.json");
-    this.load.image("room_builder", "/tilesets/Room_Builder_Office_48x48.png");
-    this.load.image("modern_office", "/tilesets/Modern_Office_48x48.png");
+    this.load.tilemapTiledJSON("office", "/maps/office2.json");
+
+    this.load.once("filecomplete-tilemapJSON-office", () => {
+      const cached = this.cache.tilemap.get("office");
+      if (!cached?.data?.tilesets) return;
+      for (const ts of cached.data.tilesets) {
+        const basename = (ts.image as string).split("/").pop()!;
+        this.load.image(ts.name, `/tilesets/${basename}`);
+      }
+    });
+
     this.load.image(SPRITE_KEY, SPRITE_PATH);
 
     for (const ws of WORKER_SPRITES) {
@@ -94,13 +103,15 @@ export class OfficeScene extends Phaser.Scene {
 
     const map = this.make.tilemap({ key: "office" });
 
-    const roomTileset = map.addTilesetImage("room_builder", "room_builder");
-    const officeTileset = map.addTilesetImage("modern_office", "modern_office");
-    if (!roomTileset || !officeTileset) {
-      console.error("[OfficeScene] Failed to load tilesets");
+    const allTilesets: Phaser.Tilemaps.Tileset[] = [];
+    for (const ts of map.tilesets) {
+      const added = map.addTilesetImage(ts.name, ts.name);
+      if (added) allTilesets.push(added);
+    }
+    if (allTilesets.length === 0) {
+      console.error("[OfficeScene] No tilesets loaded");
       return;
     }
-    const allTilesets = [roomTileset, officeTileset];
 
     map.createLayer("floor", allTilesets);
     map.createLayer("walls", allTilesets);
@@ -108,7 +119,8 @@ export class OfficeScene extends Phaser.Scene {
     map.createLayer("furniture", allTilesets);
     map.createLayer("objects", allTilesets);
 
-    renderTileObjectLayer(this, map, "desktop", allTilesets, 5);
+    renderTileObjectLayer(this, map, "props", allTilesets, 5);
+    renderTileObjectLayer(this, map, "props-over", allTilesets, 11);
 
     const overheadLayer = map.createLayer("overhead", allTilesets);
     if (overheadLayer) overheadLayer.setDepth(10);
@@ -130,14 +142,17 @@ export class OfficeScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     cam.setBackgroundColor("#1a1a2e");
+    cam.setZoom(ZOOM_DEFAULT);
     cam.startFollow(this.player.sprite, true, CAMERA_LERP, CAMERA_LERP);
 
-    this.input.on(
-      "wheel",
-      (_p: Phaser.Input.Pointer, _gx: number[], _gy: number, _gz: number, dy: number) => {
-        cam.setZoom(Phaser.Math.Clamp(cam.zoom - dy * ZOOM_SENSITIVITY, ZOOM_MIN, ZOOM_MAX));
-      },
-    );
+    const canvas = this.game.canvas;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.ctrlKey ? e.deltaY * 3 : e.deltaY;
+      cam.setZoom(Phaser.Math.Clamp(cam.zoom - delta * ZOOM_SENSITIVITY, ZOOM_MIN, ZOOM_MAX));
+    };
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    this.events.once("shutdown", () => canvas.removeEventListener("wheel", onWheel));
 
     this.initCameraDrag(cam);
 
