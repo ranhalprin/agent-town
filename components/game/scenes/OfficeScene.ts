@@ -167,6 +167,7 @@ export class OfficeScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     cam.setBackgroundColor("#1a1a2e");
+    cam.setRoundPixels(true);
     cam.setZoom(ZOOM_DEFAULT);
     cam.startFollow(this.player.sprite, true, CAMERA_LERP, CAMERA_LERP);
 
@@ -178,17 +179,17 @@ export class OfficeScene extends Phaser.Scene {
       const newZoom = Phaser.Math.Clamp(oldZoom - delta * ZOOM_SENSITIVITY, ZOOM_MIN, ZOOM_MAX);
       if (newZoom === oldZoom) return;
 
-      const worldBefore = cam.getWorldPoint(
-        e.offsetX / cam.scaleManager.displayScale.x,
-        e.offsetY / cam.scaleManager.displayScale.y,
-      );
-      cam.setZoom(newZoom);
-      const worldAfter = cam.getWorldPoint(
-        e.offsetX / cam.scaleManager.displayScale.x,
-        e.offsetY / cam.scaleManager.displayScale.y,
-      );
-      cam.scrollX += worldBefore.x - worldAfter.x;
-      cam.scrollY += worldBefore.y - worldAfter.y;
+      if (!this.cameraFollowing) {
+        const sx = e.offsetX / cam.scaleManager.displayScale.x;
+        const sy = e.offsetY / cam.scaleManager.displayScale.y;
+        const worldBefore = cam.getWorldPoint(sx, sy);
+        cam.setZoom(newZoom);
+        const worldAfter = cam.getWorldPoint(sx, sy);
+        cam.scrollX += worldBefore.x - worldAfter.x;
+        cam.scrollY += worldBefore.y - worldAfter.y;
+      } else {
+        cam.setZoom(newZoom);
+      }
     };
     canvas.addEventListener("wheel", onWheel, { passive: false });
     this.events.once("shutdown", () => canvas.removeEventListener("wheel", onWheel));
@@ -213,29 +214,32 @@ export class OfficeScene extends Phaser.Scene {
   private cameraFollowing = true;
 
   private initCameraDrag(cam: Phaser.Cameras.Scene2D.Camera) {
-    let dragStartX = 0;
-    let dragStartY = 0;
+    let lastX = 0;
+    let lastY = 0;
 
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       if (pointer.leftButtonDown()) {
         this.cameraDragging = true;
-        dragStartX = pointer.worldX;
-        dragStartY = pointer.worldY;
+        lastX = pointer.x;
+        lastY = pointer.y;
       }
     });
 
     this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
       if (!this.cameraDragging || !pointer.leftButtonDown()) return;
 
-      const dx = dragStartX - pointer.worldX;
-      const dy = dragStartY - pointer.worldY;
+      const dx = lastX - pointer.x;
+      const dy = lastY - pointer.y;
+      lastX = pointer.x;
+      lastY = pointer.y;
+
       if (Math.abs(dx) > CAMERA_DRAG_THRESHOLD || Math.abs(dy) > CAMERA_DRAG_THRESHOLD) {
         if (this.cameraFollowing) {
           cam.stopFollow();
           this.cameraFollowing = false;
         }
-        cam.scrollX += dx;
-        cam.scrollY += dy;
+        cam.scrollX += dx / cam.zoom;
+        cam.scrollY += dy / cam.zoom;
       }
     });
 

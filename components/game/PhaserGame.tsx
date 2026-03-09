@@ -42,7 +42,7 @@ export default function PhaserGame() {
     <div
       ref={containerRef}
       style={{
-        width: "calc(100% - 320px)",
+        width: "100%",
         height: "100%",
         overflow: "hidden",
         imageRendering: "pixelated",
