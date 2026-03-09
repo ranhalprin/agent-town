@@ -36,6 +36,14 @@ export default function GameHud() {
       saveOnboardingDone();
     }
   }, [showOnboarding, openPanel]);
+
+  useEffect(() => {
+    if (state.connection === "auth_failed" || state.connection === "unreachable" || state.connection === "rate_limited") {
+      setOpenPanel("connection");
+    } else if (state.connection === "connected") {
+      setOpenPanel((prev) => (prev === "connection" ? null : prev));
+    }
+  }, [state.connection]);
   const activeSessionKey = state.activeSessionKey ?? MAIN_SESSION_KEY;
   const visibleTasks = useMemo(
     () => state.tasks.filter((task) => task.sessionKey === activeSessionKey),

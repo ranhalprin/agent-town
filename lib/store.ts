@@ -135,7 +135,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       })
       .catch((err) => {
         console.warn("[Gateway] connect failed:", err.message);
-        dispatchRef.current({ type: "SET_CONNECTION", status: "error" });
+        // Don't overwrite terminal states already set by the client (auth_failed, unreachable, rate_limited)
+        const terminalStates = new Set(["auth_failed", "unreachable", "rate_limited"]);
+        if (!terminalStates.has(client.status)) {
+          dispatchRef.current({ type: "SET_CONNECTION", status: "error" });
+        }
         dispatchRef.current({
           type: "APPEND_CHAT",
           message: {

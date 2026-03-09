@@ -22,13 +22,14 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
-export type GatewayStatus = "disconnected" | "connecting" | "connected" | "error";
+export type GatewayStatus = "disconnected" | "connecting" | "connected" | "error" | "auth_failed" | "unreachable" | "rate_limited";
 
 // ── Reconnect config ───────────────────────────────────
 
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 const RECONNECT_FACTOR = 2;
+const RECONNECT_MAX_ATTEMPTS = 3;
 const HANDSHAKE_TIMEOUT_MS = 15000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 30000;
 
@@ -125,14 +126,19 @@ export class GatewayClient {
       };
 
       ws.onerror = () => {
-        this.setStatus("error");
-        this.clearPending();
+        // Don't overwrite terminal states set by handshake failure
+        if (this._status !== "auth_failed" && this._status !== "unreachable" && this._status !== "rate_limited") {
+          this.setStatus("error");
+        }
         this.rejectConnect(new Error("WebSocket connection error"));
       };
 
       ws.onclose = () => {
         const wasConnected = this._status === "connected";
-        this.setStatus("disconnected");
+        // Don't overwrite terminal states set by handshake failure
+        if (this._status !== "auth_failed" && this._status !== "unreachable" && this._status !== "rate_limited") {
+          this.setStatus("disconnected");
+        }
         this.rejectConnect(new Error("Connection closed before handshake"));
         this.clearPending();
 
@@ -149,6 +155,12 @@ export class GatewayClient {
     // If we were previously connected, reset attempt counter for faster retry
     if (wasConnected) {
       this.reconnectAttempt = 0;
+    }
+
+    if (this.reconnectAttempt >= RECONNECT_MAX_ATTEMPTS) {
+      this.autoReconnect = false;
+      this.setStatus("unreachable");
+      return;
     }
 
     const delay = Math.min(
@@ -272,7 +284,13 @@ export class GatewayClient {
 
     this.pending.set(id, {
       resolve: () => {},
-      reject: () => {},
+      reject: (err) => {
+        // Server explicitly rejected the handshake — stop retrying immediately.
+        this.autoReconnect = false;
+        const isRateLimited = /rate.limit|too many/i.test(err.message);
+        this.setStatus(isRateLimited ? "rate_limited" : "auth_failed");
+        this.rejectConnect(err);
+      },
       timer,
     });
 

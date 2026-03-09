@@ -28,14 +28,16 @@ export interface BgmState {
 }
 
 export function useBgm(): BgmState {
-  const [volume, setVolume] = useState(() => clampVolume(loadBgmVolume()));
+  const [volume, setVolume] = useState(DEFAULT_BGM_VOLUME);
   const volumeRef = useRef(volume);
   volumeRef.current = volume;
 
   useEffect(() => {
+    const saved = clampVolume(loadBgmVolume());
+    setVolume(saved);
     const audio = getAudio();
-    audio.volume = volumeRef.current;
-    if (volumeRef.current > 0) {
+    audio.volume = saved;
+    if (saved > 0) {
       audio.play().catch(() => {});
     }
   }, []);

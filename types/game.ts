@@ -4,7 +4,10 @@ export type ConnectionStatus =
   | "disconnected"
   | "connecting"
   | "connected"
-  | "error";
+  | "error"
+  | "auth_failed"
+  | "unreachable"
+  | "rate_limited";
 
 export type SeatFacing = "right" | "up" | "left" | "down";
 
