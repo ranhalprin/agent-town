@@ -57,6 +57,8 @@ export class OfficeScene extends Phaser.Scene {
   private pathfinder!: Pathfinder;
   private pois: POI[] = [];
 
+  private doors: { sprite: Phaser.GameObjects.Sprite; x: number; y: number; open: boolean }[] = [];
+
   /** Interaction system */
   private interactionMenu!: InteractionMenu;
   private nearestWorker: Worker | null = null;
@@ -98,6 +100,11 @@ export class OfficeScene extends Phaser.Scene {
     this.load.spritesheet("anim-cauldron", "/sprites/animated_witch_cauldron_48x48.png", {
       frameWidth: 96,
       frameHeight: 96,
+    });
+
+    this.load.spritesheet("anim-door", "/sprites/animated_door_big_4_48x48.png", {
+      frameWidth: 48,
+      frameHeight: 144,
     });
   }
 
@@ -176,6 +183,7 @@ export class OfficeScene extends Phaser.Scene {
 
     this.pois = parsePOIs(map);
     resetWanderClock();
+    this.initDoors();
     this.initBossSeat(bossSpawn);
     this.initInteractionUI();
     this.initGameEvents();
@@ -497,6 +505,65 @@ export class OfficeScene extends Phaser.Scene {
 
   // ── Boss seat ──────────────────────────────────────────
 
+  private initDoors() {
+    const doorPositions = [
+      { x: 528, y: 528 },
+      { x: 960, y: 528 },
+    ];
+
+    if (!this.anims.exists("door-open")) {
+      this.anims.create({
+        key: "door-open",
+        frames: this.anims.generateFrameNumbers("anim-door", { start: 0, end: 4 }),
+        frameRate: 10,
+        repeat: 0,
+      });
+      this.anims.create({
+        key: "door-close",
+        frames: this.anims.generateFrameNumbers("anim-door", { start: 4, end: 0 }),
+        frameRate: 10,
+        repeat: 0,
+      });
+    }
+
+    for (const pos of doorPositions) {
+      const sprite = this.add
+        .sprite(pos.x, pos.y, "anim-door", 0)
+        .setOrigin(0, 0)
+        .setDepth(4);
+      this.doors.push({ sprite, x: pos.x + 24, y: pos.y + 48, open: false });
+    }
+  }
+
+  private updateDoors() {
+    const threshold = 60;
+    for (const door of this.doors) {
+      let near = false;
+      const dx = this.player.sprite.x - door.x;
+      const dy = this.player.sprite.y - door.y;
+      if (dx * dx + dy * dy < threshold * threshold) {
+        near = true;
+      }
+      if (!near) {
+        for (const w of this.workers) {
+          const wx = w.sprite.x - door.x;
+          const wy = w.sprite.y - door.y;
+          if (wx * wx + wy * wy < threshold * threshold) {
+            near = true;
+            break;
+          }
+        }
+      }
+      if (near && !door.open) {
+        door.open = true;
+        door.sprite.play("door-open");
+      } else if (!near && door.open) {
+        door.open = false;
+        door.sprite.play("door-close");
+      }
+    }
+  }
+
   private initBossSeat(bossSpawn: { x: number; y: number }) {
     this.terminalZone = { x: bossSpawn.x, y: bossSpawn.y };
 
@@ -531,6 +598,7 @@ export class OfficeScene extends Phaser.Scene {
       this.resumeCameraFollow();
     }
     for (const worker of this.workers) worker.update();
+    this.updateDoors();
 
     // Worker proximity detection
     const nearest = this.findNearestWorker();
