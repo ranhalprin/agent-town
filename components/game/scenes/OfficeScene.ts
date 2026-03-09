@@ -174,7 +174,21 @@ export class OfficeScene extends Phaser.Scene {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const delta = e.ctrlKey ? e.deltaY * 3 : e.deltaY;
-      cam.setZoom(Phaser.Math.Clamp(cam.zoom - delta * ZOOM_SENSITIVITY, ZOOM_MIN, ZOOM_MAX));
+      const oldZoom = cam.zoom;
+      const newZoom = Phaser.Math.Clamp(oldZoom - delta * ZOOM_SENSITIVITY, ZOOM_MIN, ZOOM_MAX);
+      if (newZoom === oldZoom) return;
+
+      const worldBefore = cam.getWorldPoint(
+        e.offsetX / cam.scaleManager.displayScale.x,
+        e.offsetY / cam.scaleManager.displayScale.y,
+      );
+      cam.setZoom(newZoom);
+      const worldAfter = cam.getWorldPoint(
+        e.offsetX / cam.scaleManager.displayScale.x,
+        e.offsetY / cam.scaleManager.displayScale.y,
+      );
+      cam.scrollX += worldBefore.x - worldAfter.x;
+      cam.scrollY += worldBefore.y - worldAfter.y;
     };
     canvas.addEventListener("wheel", onWheel, { passive: false });
     this.events.once("shutdown", () => canvas.removeEventListener("wheel", onWheel));

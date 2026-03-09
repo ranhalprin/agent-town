@@ -44,6 +44,7 @@ export default function PhaserGame() {
       style={{
         width: "calc(100% - 320px)",
         height: "100%",
+        overflow: "hidden",
         imageRendering: "pixelated",
       }}
     />

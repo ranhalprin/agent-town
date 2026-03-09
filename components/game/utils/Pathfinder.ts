@@ -120,11 +120,10 @@ export class Pathfinder {
     let sr = this.toRow(sy);
     let ec = this.toCol(ex);
     let er = this.toRow(ey);
+    let endSnapped = false;
 
     if (!this.valid(sr, sc)) return null;
 
-    // If start is blocked (e.g. worker sitting inside desk collision),
-    // find the nearest walkable cell as starting point.
     if (!this.grid[sr]?.[sc]) {
       const ns = this.nearestWalkableCell(sr, sc);
       if (!ns) return null;
@@ -137,6 +136,7 @@ export class Pathfinder {
       if (!nearest) return null;
       er = nearest.r;
       ec = nearest.c;
+      endSnapped = true;
     }
 
     if (sr === er && sc === ec) {
@@ -157,7 +157,18 @@ export class Pathfinder {
       const cur = open.pop()!;
 
       if (cur.r === er && cur.c === ec) {
-        return this.reconstruct(cur);
+        const path = this.reconstruct(cur);
+        if (path.length > 0) {
+          if (endSnapped) {
+            path[path.length - 1] = {
+              x: Math.max(ec * CELL_SIZE, Math.min((ec + 1) * CELL_SIZE, ex)),
+              y: Math.max(er * CELL_SIZE, Math.min((er + 1) * CELL_SIZE, ey)),
+            };
+          } else {
+            path[path.length - 1] = { x: ex, y: ey };
+          }
+        }
+        return path;
       }
 
       const key = cur.r * this.cols + cur.c;

@@ -13,6 +13,7 @@ export interface POIDef {
   name: string;
   x: number;
   y: number;
+  facing: Direction | null;
 }
 
 export function buildSpriteFrames(scene: Phaser.Scene, key: string) {
@@ -35,7 +36,11 @@ export function buildSpriteFrames(scene: Phaser.Scene, key: string) {
 
 export function parseSpawns(map: Phaser.Tilemaps.Tilemap) {
   const spawnsLayer = map.getObjectLayer("spawns");
-  const fallback = { x: map.widthInPixels / 2, y: map.heightInPixels / 2 };
+  const fallback: { x: number; y: number; facing: Direction } = {
+    x: map.widthInPixels / 2,
+    y: map.heightInPixels / 2,
+    facing: "down",
+  };
 
   if (!spawnsLayer || spawnsLayer.objects.length === 0) {
     return { bossSpawn: fallback, workerSpawns: [] as SeatDef[] };
@@ -78,7 +83,10 @@ export function parsePOIs(map: Phaser.Tilemaps.Tilemap): POIDef[] {
   const pois: POIDef[] = [];
   for (const obj of layer.objects) {
     if (obj.name && typeof obj.x === "number" && typeof obj.y === "number") {
-      pois.push({ name: obj.name, x: obj.x, y: obj.y });
+      const props = obj.properties as Array<{ name: string; value: string }> | undefined;
+      const fp = props?.find((p) => p.name === "facing");
+      const facing = (fp?.value as Direction) ?? null;
+      pois.push({ name: obj.name, x: obj.x, y: obj.y, facing });
     }
   }
   return pois;

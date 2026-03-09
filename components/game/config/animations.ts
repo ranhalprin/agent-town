@@ -44,7 +44,6 @@ export const WORKER_SPRITES: WorkerSpriteConfig[] = [
   { key: "character_03", path: "/characters/Premade_Character_48x48_03.png", label: "Bob" },
   { key: "character_04", path: "/characters/Premade_Character_48x48_04.png", label: "Carol" },
   { key: "character_05", path: "/characters/Premade_Character_48x48_05.png", label: "Dave" },
-  { key: "character_06", path: "/characters/Premade_Character_48x48_06.png", label: "Eve" },
 ];
 
 const directions = ["right", "up", "left", "down"] as const;

@@ -19,10 +19,6 @@ export function resetWanderClock() {
   wanderClock.lastStartedAt = -Infinity;
 }
 
-function poiFacing(poiName: string) {
-  return poiName.toLowerCase().includes("sofa") ? "down" as const : "up" as const;
-}
-
 function poiBubbleText(poiName: string): string {
   const lower = poiName.toLowerCase();
   for (const [keyword, texts] of Object.entries(POI_BUBBLE_TEXTS)) {
@@ -90,7 +86,7 @@ function startWander(ctx: WorkerCtx) {
 function wanderToPoi(ctx: WorkerCtx) {
   const poi = Phaser.Utils.Array.GetRandom(ctx.pois) as POI;
   ctx.isWandering = true;
-  ctx.arrivalFacing = poiFacing(poi.name);
+  ctx.arrivalFacing = poi.facing ?? null;
 
   ctx.onArrival = () => {
     if (ctx._status !== "idle" || !ctx.canWander) return;
