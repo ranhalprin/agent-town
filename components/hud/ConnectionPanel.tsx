@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useStudio } from "@/lib/store";
 import { LS_CONFIG, STATUS_LABELS } from "@/lib/constants";
 import { parseGatewayAddress } from "@/lib/utils";
@@ -11,24 +11,24 @@ const DEFAULT_TOKEN = process.env.NEXT_PUBLIC_GATEWAY_TOKEN ?? "";
 
 export default function ConnectionPanel() {
   const { state, connect, disconnect } = useStudio();
-  const [config] = useState(() => {
+  const [url, setUrl] = useState(DEFAULT_GATEWAY);
+  const [token, setToken] = useState(DEFAULT_TOKEN);
+
+  useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_CONFIG);
       if (raw) {
         const parsed = JSON.parse(raw) as { url?: string; token?: string };
-        return {
-          url: parsed.url || DEFAULT_GATEWAY,
-          token: parsed.token || DEFAULT_TOKEN,
-        };
+        if (parsed.url) setUrl(parsed.url);
+        if (parsed.token) setToken(parsed.token);
       }
     } catch {}
-
-    return { url: DEFAULT_GATEWAY, token: DEFAULT_TOKEN };
-  });
-  const [url, setUrl] = useState(config.url);
-  const [token, setToken] = useState(config.token);
+  }, []);
   const isConnected = state.connection === "connected";
   const isConnecting = state.connection === "connecting";
+  const isAuthFailed = state.connection === "auth_failed";
+  const isUnreachable = state.connection === "unreachable";
+  const isRateLimited = state.connection === "rate_limited";
 
   const [error, setError] = useState("");
 
@@ -72,6 +72,21 @@ export default function ConnectionPanel() {
           placeholder="optional"
           disabled={isConnected || isConnecting}
         />
+        {isAuthFailed && !error && (
+          <p style={{ color: "var(--pixel-red)", fontSize: "8px" }}>
+            Authentication failed. Token may be invalid or expired — please re-enter.
+          </p>
+        )}
+        {isUnreachable && !error && (
+          <p style={{ color: "var(--pixel-red)", fontSize: "8px" }}>
+            Gateway is unreachable. Please check if your gateway is running.
+          </p>
+        )}
+        {isRateLimited && !error && (
+          <p style={{ color: "var(--pixel-red)", fontSize: "8px" }}>
+            Too many failed attempts. Please wait a moment before retrying.
+          </p>
+        )}
         {error && (
           <p style={{ color: "var(--pixel-red)", fontSize: "8px" }}>{error}</p>
         )}
