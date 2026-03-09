@@ -56,7 +56,7 @@ export function parseSpawns(map: Phaser.Tilemaps.Tilemap) {
     }
   }
 
-  const bossSpawn = { x: bossObj.x!, y: bossObj.y! };
+  const bossSpawn = { x: bossObj.x!, y: bossObj.y!, facing: getFacing(bossObj) };
 
   const workerSpawns: SeatDef[] = spawnsLayer.objects
     .filter((obj) => obj !== bossObj)
@@ -127,12 +127,24 @@ export function buildCollisionRects(
   return collisionRects;
 }
 
+export interface AnimatedProp {
+  tilesetName: string;
+  anchorLocalId: number;
+  skipLocalIds: Set<number>;
+  spriteKey: string;
+  frameWidth: number;
+  frameHeight: number;
+  endFrame: number;
+  frameRate: number;
+}
+
 export function renderTileObjectLayer(
   scene: Phaser.Scene,
   map: Phaser.Tilemaps.Tilemap,
   layerName: string,
   tilesets: Phaser.Tilemaps.Tileset[],
   depth: number,
+  animatedProps?: AnimatedProp[],
 ) {
   const objectLayer = map.getObjectLayer(layerName);
   if (!objectLayer) return;
@@ -150,6 +162,35 @@ export function renderTileObjectLayer(
     if (!tileset) continue;
 
     const localId = obj.gid - tileset.firstgid;
+
+    const anim = animatedProps?.find(
+      (a) => a.tilesetName === tileset!.name && a.skipLocalIds.has(localId),
+    );
+
+    if (anim) {
+      if (localId === anim.anchorLocalId) {
+        const animKey = `${anim.spriteKey}-anim`;
+        if (!scene.anims.exists(animKey)) {
+          scene.anims.create({
+            key: animKey,
+            frames: scene.anims.generateFrameNumbers(anim.spriteKey, {
+              start: 0,
+              end: anim.endFrame,
+            }),
+            frameRate: anim.frameRate,
+            repeat: -1,
+          });
+        }
+        const tileH = tileset.tileHeight;
+        scene.add
+          .sprite(obj.x!, obj.y! - anim.frameHeight + tileH, anim.spriteKey)
+          .setOrigin(0, 0)
+          .setDepth(depth)
+          .play(animKey);
+      }
+      continue;
+    }
+
     const tileW = tileset.tileWidth;
     const tileH = tileset.tileHeight;
     const srcX = (localId % tileset.columns) * tileW;

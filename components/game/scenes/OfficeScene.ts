@@ -21,6 +21,7 @@ import {
   parsePOIs,
   buildCollisionRects,
   renderTileObjectLayer,
+  type AnimatedProp,
   type SeatDef,
 } from "../utils/MapHelpers";
 import { gameEvents } from "@/lib/events";
@@ -93,6 +94,11 @@ export class OfficeScene extends Phaser.Scene {
       frameWidth: 48,
       frameHeight: 48,
     });
+
+    this.load.spritesheet("anim-cauldron", "/sprites/animated_witch_cauldron_48x48.png", {
+      frameWidth: 96,
+      frameHeight: 96,
+    });
   }
 
   create() {
@@ -119,7 +125,19 @@ export class OfficeScene extends Phaser.Scene {
     map.createLayer("furniture", allTilesets);
     map.createLayer("objects", allTilesets);
 
-    renderTileObjectLayer(this, map, "props", allTilesets, 5);
+    const animatedProps: AnimatedProp[] = [
+      {
+        tilesetName: "11_Halloween_48x48",
+        anchorLocalId: 130,
+        skipLocalIds: new Set([130, 131, 146, 147]),
+        spriteKey: "anim-cauldron",
+        frameWidth: 96,
+        frameHeight: 96,
+        endFrame: 11,
+        frameRate: 8,
+      },
+    ];
+    renderTileObjectLayer(this, map, "props", allTilesets, 5, animatedProps);
     renderTileObjectLayer(this, map, "props-over", allTilesets, 11);
 
     const overheadLayer = map.createLayer("overhead", allTilesets);
@@ -133,7 +151,7 @@ export class OfficeScene extends Phaser.Scene {
     const { bossSpawn, workerSpawns } = parseSpawns(map);
     this.seatDefs = workerSpawns;
 
-    this.player = new Player(this, bossSpawn.x, bossSpawn.y);
+    this.player = new Player(this, bossSpawn.x, bossSpawn.y, bossSpawn.facing);
     this.physics.add.collider(this.player.sprite, this.collisionGroup);
 
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
@@ -222,7 +240,7 @@ export class OfficeScene extends Phaser.Scene {
 
   private spawnWorker(seatDef: SeatDef, seat: SeatState) {
     if (!seat.spriteKey) return null;
-    const initialFacing: Direction = seat.spriteKey === "character_06" ? "right" : seatDef.facing;
+    const initialFacing: Direction = seatDef.facing;
     const worker = new Worker(
       this,
       seatDef.x,

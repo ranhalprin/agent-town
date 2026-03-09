@@ -13,11 +13,12 @@ export class Player {
   sprite: Phaser.Physics.Arcade.Sprite;
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd: Record<string, Phaser.Input.Keyboard.Key>;
-  private facing: Direction = "left";
+  private facing: Direction;
   private arrow: Phaser.GameObjects.Sprite | null = null;
   private hasMovedOnce = false;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, facing: Direction = "left") {
+    this.facing = facing;
     this.createAnimations(scene);
 
     this.sprite = scene.physics.add.sprite(x, y, SPRITE_KEY, 0);
@@ -39,7 +40,7 @@ export class Player {
       D: Phaser.Input.Keyboard.KeyCodes.D,
     }) as Record<string, Phaser.Input.Keyboard.Key>;
 
-    this.sprite.anims.play("idle-left");
+    this.sprite.anims.play(`idle-${this.facing}`);
   }
 
   private initArrow(scene: Phaser.Scene, x: number, y: number) {
