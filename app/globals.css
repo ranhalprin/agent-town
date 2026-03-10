@@ -836,7 +836,7 @@ canvas {
 .seat-manager-overlay {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 100;
   background: rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
@@ -847,7 +847,7 @@ canvas {
 
 .seat-manager {
   width: min(1080px, 94vw);
-  height: min(680px, 88vh);
+  height: min(620px, 80vh);
   display: grid;
   grid-template-columns: 320px 1fr;
   grid-template-rows: auto 1fr;

@@ -9,6 +9,37 @@ function seatStatusLabel(seat: SeatState) {
   return seat.status;
 }
 
+function SeatGroup({ title, seats }: { title: string; seats: SeatState[] }) {
+  if (seats.length === 0) return null;
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ fontSize: 7, color: "var(--pixel-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+        {title}
+      </div>
+      {seats.map((seat) => (
+        <div key={seat.seatId} className="hud-workers__item">
+          <div className="hud-workers__top">
+            <span className={`hud-status hud-status--${seat.status}`}>{seatStatusLabel(seat)}</span>
+            <span>
+              {seat.assigned ? seat.label : "Vacant Seat"}
+              {seat.seatType === "agent" && seat.agentConfig?.agentId && (
+                <span style={{ fontSize: 7, color: "var(--pixel-accent)", marginLeft: 6 }}>
+                  [{seat.agentConfig.agentId}]
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="hud-workers__task">
+            {seat.assigned
+              ? seat.taskSnippet ?? `${seat.roleTitle ?? (seat.seatType === "agent" ? "Agent" : "Worker")} waiting at desk`
+              : "Assign a crew member to this seat"}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function WorkerPanel({
   seats,
   onOpenManager,
@@ -18,6 +49,8 @@ export default function WorkerPanel({
 }) {
   const assigned = seats.filter((s) => s.assigned).length;
   const working = seats.filter((s) => s.assigned && (s.status === "running" || s.status === "returning")).length;
+  const agentSeats = seats.filter((s) => s.seatType === "agent");
+  const workerSeats = seats.filter((s) => s.seatType !== "agent");
 
   return (
     <HudFlyout
@@ -35,17 +68,8 @@ export default function WorkerPanel({
       }
     >
       <div className="hud-workers">
-        {seats.map((seat) => (
-          <div key={seat.seatId} className="hud-workers__item">
-            <div className="hud-workers__top">
-              <span className={`hud-status hud-status--${seat.status}`}>{seatStatusLabel(seat)}</span>
-              <span>{seat.assigned ? seat.label : "Vacant Seat"}</span>
-            </div>
-            <div className="hud-workers__task">
-              {seat.assigned ? seat.taskSnippet ?? `${seat.roleTitle ?? "Agent"} waiting at desk` : "Assign a crew member to this seat"}
-            </div>
-          </div>
-        ))}
+        <SeatGroup title={`Agents (${agentSeats.length})`} seats={agentSeats} />
+        <SeatGroup title={`Workers (${workerSeats.length})`} seats={workerSeats} />
       </div>
     </HudFlyout>
   );

@@ -1,8 +1,9 @@
-import type { SeatState } from "@/types/game";
+import type { SeatState, AgentConfig } from "@/types/game";
 import type { SeatDef } from "@/components/game/utils/MapHelpers";
 
 export interface GameEventMap {
   "seats-discovered": [seats: SeatDef[]];
+  "agents-discovered": [agents: AgentConfig[]];
   "seat-configs-updated": [seats: SeatState[]];
   "task-assigned": [taskId: string, message: string, seatId?: string, sessionKey?: string];
   "task-routed": [taskId: string, seatId: string, actorName: string];

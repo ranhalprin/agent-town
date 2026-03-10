@@ -8,6 +8,8 @@
 import type {
   ConnectionStatus,
   SeatState,
+  SeatType,
+  AgentConfig,
   TaskItem,
   ChatMessage,
   SessionMetrics,
@@ -110,11 +112,13 @@ export function mergeDiscoveredSeats(
     const spriteKey = stored?.spriteKey ?? fallback?.key;
     const spritePath = stored?.spritePath ?? fallback?.path;
     const label = stored?.label ?? fallback?.label ?? `Seat ${index + 1}`;
-    const roleTitle = stored?.roleTitle ?? (assigned ? "Agent" : undefined);
+    const seatType: SeatType = stored?.seatType ?? "worker";
+    const roleTitle = stored?.roleTitle ?? (assigned ? (seatType === "agent" ? "Independent Agent" : "Worker") : undefined);
 
     return {
       seatId: seat.seatId,
       label,
+      seatType,
       roleTitle,
       assigned,
       spriteKey: assigned ? spriteKey : undefined,
@@ -126,6 +130,7 @@ export function mergeDiscoveredSeats(
       runId: runtime?.runId,
       taskSnippet: runtime?.taskSnippet,
       startedAt: runtime?.startedAt,
+      agentConfig: stored?.agentConfig,
     };
   });
 }
@@ -335,6 +340,7 @@ export function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
           const next = { ...seat, ...action.patch };
           if (!next.assigned) {
             next.label = seat.label;
+            next.seatType = "worker";
             next.roleTitle = undefined;
             next.spriteKey = undefined;
             next.spritePath = undefined;
@@ -342,6 +348,7 @@ export function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
             next.runId = undefined;
             next.taskSnippet = undefined;
             next.startedAt = undefined;
+            next.agentConfig = undefined;
           }
           return next;
         }),

@@ -210,10 +210,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     const configs: PersistedSeatConfig[] = state.seats.map((seat) => ({
       seatId: seat.seatId,
       label: seat.label,
+      seatType: seat.seatType,
       roleTitle: seat.roleTitle,
       assigned: seat.assigned,
       spriteKey: seat.spriteKey,
       spritePath: seat.spritePath,
+      agentConfig: seat.agentConfig,
     }));
     seatConfigRef.current = configs;
     saveSeatConfigs(configs);
@@ -242,7 +244,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     const client = clientRef.current;
     if (!client || client.status !== "connected") return;
     const task = findTask(tasksRef.current, taskId);
-    const sessionKey = task?.sessionKey ?? activeSessionKeyRef.current ?? MAIN_SESSION_KEY;
+
+    // For agent-type seats, use the agent's own session key
+    const seat = seatId ? seatsRef.current.find((s) => s.seatId === seatId) : undefined;
+    const isAgentSeat = seat?.seatType === "agent" && seat.agentConfig?.agentId;
+    const sessionKey = isAgentSeat
+      ? `agent:${seat!.agentConfig!.agentId}:main`
+      : (task?.sessionKey ?? activeSessionKeyRef.current ?? MAIN_SESSION_KEY);
     const actorName = task?.actorName ?? resolveSeatLabelForTask(seatsRef.current, seatId);
 
     dispatchRef.current({ type: "UPDATE_TASK", taskId, patch: { status: "submitted" } });

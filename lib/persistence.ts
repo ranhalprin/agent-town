@@ -10,6 +10,8 @@ import type {
   ChatMessage,
   GatewayConfig,
   SessionRecord,
+  SeatType,
+  AgentConfig,
 } from "@/types/game";
 import {
   LS_CONFIG,
@@ -27,10 +29,12 @@ import {
 export interface PersistedSeatConfig {
   seatId: string;
   label?: string;
+  seatType?: SeatType;
   roleTitle?: string;
   assigned?: boolean;
   spriteKey?: string;
   spritePath?: string;
+  agentConfig?: AgentConfig;
 }
 
 // ── Generic helpers ────────────────────────────────────
