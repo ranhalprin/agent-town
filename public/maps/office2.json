@@ -1484,6 +1484,54 @@
                  "width":0,
                  "x":408.054,
                  "y":334.674
+                },
+                {
+                 "height":0,
+                 "id":273,
+                 "name":"",
+                 "point":true,
+                 "properties":[
+                        {
+                         "name":"facing",
+                         "type":"string",
+                         "value":"down"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":551.97,
+                 "y":336.339
+                },
+                {
+                 "height":0,
+                 "id":274,
+                 "name":"",
+                 "point":true,
+                 "properties":[
+                        {
+                         "name":"facing",
+                         "type":"string",
+                         "value":"up"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":263.373,
+                 "y":462.687
+                },
+                {
+                 "height":0,
+                 "id":275,
+                 "name":"",
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":551.97,
+                 "y":463.396
                 }],
          "opacity":1,
          "type":"objectgroup",
