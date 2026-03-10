@@ -400,6 +400,22 @@ export class OfficeScene extends Phaser.Scene {
         },
       },
       {
+        label: "New Session",
+        enabled: true,
+        action: () => {
+          this.menuOpen = false;
+          gameEvents.emit("new-session-for-seat", worker.seatId);
+        },
+      },
+      {
+        label: "Session History",
+        enabled: true,
+        action: () => {
+          this.menuOpen = false;
+          gameEvents.emit("open-session-history", worker.seatId);
+        },
+      },
+      {
         label: "Stop Task",
         enabled: isWorking,
         action: () => {

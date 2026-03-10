@@ -8,7 +8,7 @@ export default function TerminalModal() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [targetSeatId, setTargetSeatId] = useState<string | undefined>(undefined);
-  const { state, assignTask } = useStudio();
+  const { state, assignTask, prepareSessionForSeat } = useStudio();
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const isConnected = state.connection === "connected";
@@ -20,19 +20,24 @@ export default function TerminalModal() {
   }, []);
 
   useEffect(() => {
-    const unsubOpen = gameEvents.on("open-terminal", (seatId) => {
+    const handleOpen = async (seatId?: string) => {
+      if (seatId) {
+        await prepareSessionForSeat(seatId);
+      }
       setTargetSeatId(seatId);
       setOpen(true);
+    };
+    const unsubOpen = gameEvents.on("open-terminal", (seatId) => {
+      void handleOpen(seatId);
     });
     const unsubQueue = gameEvents.on("open-terminal-queue", (seatId) => {
-      setTargetSeatId(seatId);
-      setOpen(true);
+      void handleOpen(seatId);
     });
     return () => {
       unsubOpen();
       unsubQueue();
     };
-  }, []);
+  }, [prepareSessionForSeat]);
 
   // Focus input when opened
   useEffect(() => {

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { StudioProvider } from "@/lib/store";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import TerminalModal from "@/components/panel/TerminalModal";
+import WorkerSessionHistoryModal from "@/components/panel/WorkerSessionHistoryModal";
 import GameHud from "@/components/hud/GameHud";
 
 const PhaserGame = dynamic(() => import("@/components/game/PhaserGame"), {
@@ -25,6 +26,7 @@ export default function Page() {
             <GameHud />
           </div>
           <TerminalModal />
+          <WorkerSessionHistoryModal />
         </main>
       </StudioProvider>
     </ErrorBoundary>

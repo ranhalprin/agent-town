@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import React from "react";
-import type { SeatState, TaskItem, GatewayConfig } from "@/types/game";
+import type { SeatState, TaskItem, GatewayConfig, ChatMessage } from "@/types/game";
 import type { StudioSnapshot } from "@/types/game";
 import { GatewayClient } from "./gateway";
 import type { GatewayFrame } from "./gateway-types";
@@ -57,6 +57,10 @@ interface StudioContextValue {
   updateSeatConfig: (seatId: string, patch: Partial<SeatState>) => void;
   newSession: () => void;
   switchSession: (sessionKey: string) => void;
+  prepareSessionForSeat: (seatId: string) => Promise<void>;
+  newSessionForSeat: (seatId: string) => void;
+  getBoundSessionForSeat: (seatId: string) => string | undefined;
+  loadSessionChat: (sessionKey: string) => Promise<ChatMessage[]>;
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -85,6 +89,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const clientRef = useRef<GatewayClient | null>(null);
   const configRef = useRef<GatewayConfig>({ url: DEFAULT_URL, token: DEFAULT_TOKEN });
   const activeSessionKeyRef = useRef<string | undefined>(undefined);
+  const seatIdToSessionKeyRef = useRef(new Map<string, string>());
   const sessionRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const taskCounterRef = useRef(0);
 
@@ -341,6 +346,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return gameEvents.on("task-routed", (taskId, seatId, actorName) => {
       dispatchRef.current({ type: "UPDATE_TASK", taskId, patch: { seatId, actorName } });
+      const task = findTask(tasksRef.current, taskId);
+      if (task?.sessionKey) seatIdToSessionKeyRef.current.set(seatId, task.sessionKey);
     });
   }, []);
 
@@ -499,9 +506,64 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     dispatchRef.current({ type: "HYDRATE_SESSION_CHAT", sessionKey, chatMessages: messages });
   }, []);
 
+  const prepareSessionForSeat = useCallback(
+    async (seatId: string) => {
+      const bound = seatIdToSessionKeyRef.current.get(seatId);
+      if (bound) {
+        await switchSession(bound);
+      } else {
+        newSession();
+        seatIdToSessionKeyRef.current.set(seatId, activeSessionKeyRef.current ?? MAIN_SESSION_KEY);
+      }
+    },
+    [newSession, switchSession],
+  );
+
+  const newSessionForSeat = useCallback((seatId: string) => {
+    newSession();
+    const newKey = activeSessionKeyRef.current ?? MAIN_SESSION_KEY;
+    seatIdToSessionKeyRef.current.set(seatId, newKey);
+  }, [newSession]);
+
+  const getBoundSessionForSeat = useCallback((seatId: string) => {
+    return seatIdToSessionKeyRef.current.get(seatId);
+  }, []);
+
+  const loadSessionChat = useCallback(async (sessionKey: string): Promise<ChatMessage[]> => {
+    const client = clientRef.current;
+    if (!client || client.status !== "connected") return [];
+    try {
+      return await loadSessionPreview(client, sessionKey);
+    } catch (err) {
+      console.error("[Store] loadSessionChat failed:", err);
+      return [];
+    }
+  }, []);
+
+  useEffect(() => {
+    return gameEvents.on("new-session-for-seat", (seatId) => {
+      newSessionForSeat(seatId);
+      gameEvents.emit("open-terminal", seatId);
+    });
+  }, [newSessionForSeat]);
+
   return React.createElement(
     StudioContext.Provider,
-    { value: { state, connect, disconnect, assignTask, updateSeatConfig, newSession, switchSession } },
+    {
+      value: {
+        state,
+        connect,
+        disconnect,
+        assignTask,
+        updateSeatConfig,
+        newSession,
+        switchSession,
+        prepareSessionForSeat,
+        newSessionForSeat,
+        getBoundSessionForSeat,
+        loadSessionChat,
+      },
+    },
     children,
   );
 }

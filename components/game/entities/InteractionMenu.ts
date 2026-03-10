@@ -14,8 +14,11 @@ const PAD_Y = 6;
 const BG_COLOR = 0x252219;
 const BG_ALPHA = 0.96;
 const BORDER_COLOR = 0x4a4238;
-const HIGHLIGHT_COLOR = 0x322c24;
+const HIGHLIGHT_FILL = 0x4a4238;
+const HIGHLIGHT_ALPHA = 0.9;
+const HIGHLIGHT_BORDER = 0xc9a227;
 const TEXT_COLOR = "#e8e2d8";
+const TEXT_HIGHLIGHT = "#f5e6b3";
 const DISABLED_COLOR = "#a09888";
 const DEPTH = 30;
 
@@ -23,7 +26,7 @@ export class InteractionMenu {
   private container: Phaser.GameObjects.Container;
   private bg: Phaser.GameObjects.Graphics;
   private items: Phaser.GameObjects.Text[] = [];
-  private highlights: Phaser.GameObjects.Rectangle[] = [];
+  private highlights: Phaser.GameObjects.Graphics[] = [];
   private hitZones: Phaser.GameObjects.Rectangle[] = [];
   private scene: Phaser.Scene;
   private options: MenuOption[] = [];
@@ -84,11 +87,14 @@ export class InteractionMenu {
       const opt = options[i];
       const y = PAD_Y + i * ITEM_HEIGHT;
 
-      const highlight = this.scene.add.rectangle(
-        MENU_WIDTH / 2, y + ITEM_HEIGHT / 2,
-        MENU_WIDTH - 4, ITEM_HEIGHT - 2,
-        HIGHLIGHT_COLOR, 0.6,
-      );
+      const highlight = this.scene.add.graphics();
+      highlight.setPosition(MENU_WIDTH / 2, y + ITEM_HEIGHT / 2);
+      const w = MENU_WIDTH - 4;
+      const h = ITEM_HEIGHT - 2;
+      highlight.fillStyle(HIGHLIGHT_FILL, HIGHLIGHT_ALPHA);
+      highlight.fillRect(-w / 2, -h / 2, w, h);
+      highlight.lineStyle(2, HIGHLIGHT_BORDER, 0.95);
+      highlight.strokeRect(-w / 2, -h / 2, w, h);
       highlight.setVisible(false);
       this.highlights.push(highlight);
       this.container.add(highlight);
@@ -184,7 +190,12 @@ export class InteractionMenu {
 
   private updateHighlight() {
     for (let i = 0; i < this.highlights.length; i++) {
-      this.highlights[i].setVisible(i === this.selectedIndex && this.options[i]?.enabled);
+      const selected = i === this.selectedIndex && this.options[i]?.enabled;
+      this.highlights[i].setVisible(selected);
+      const opt = this.options[i];
+      if (opt?.enabled) {
+        this.items[i].setColor(selected ? TEXT_HIGHLIGHT : TEXT_COLOR);
+      }
     }
   }
 

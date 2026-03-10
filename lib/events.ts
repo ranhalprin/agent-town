@@ -18,6 +18,8 @@ export interface GameEventMap {
   "open-terminal-queue": [seatId: string];
   "stop-task": [runId: string, seatId: string];
   "terminal-closed": [];
+  "new-session-for-seat": [seatId: string];
+  "open-session-history": [seatId: string];
 }
 
 type Listener<T extends unknown[]> = (...args: T) => void;
