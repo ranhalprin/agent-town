@@ -7,19 +7,20 @@ interface HudFlyoutProps {
   subtitle?: string;
   headerAction?: ReactNode;
   children: ReactNode;
+  bodyClass?: string;
 }
 
-export default function HudFlyout({ title, subtitle, headerAction, children }: HudFlyoutProps) {
+export default function HudFlyout({ title, subtitle, headerAction, children, bodyClass }: HudFlyoutProps) {
   return (
     <div className="hud-flyout">
       <div className="hud-flyout__header">
-        <div>
+        <div className="hud-flyout__top-row">
           <div className="hud-flyout__title">{title}</div>
-          {subtitle ? <div className="hud-flyout__subtitle">{subtitle}</div> : null}
+          {headerAction ?? null}
         </div>
-        {headerAction ?? null}
+        {subtitle ? <div className="hud-flyout__subtitle">{subtitle}</div> : null}
       </div>
-      <div className="hud-flyout__body">{children}</div>
+      <div className={`hud-flyout__body ${bodyClass ?? ""}`}>{children}</div>
     </div>
   );
 }

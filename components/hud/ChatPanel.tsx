@@ -65,8 +65,9 @@ export default function ChatPanel({
       headerAction={
         <SessionSwitcher sessions={sessions} activeKey={activeSessionKey} />
       }
+      bodyClass="hud-flyout__body--chat"
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="hud-chat-layout">
         <div ref={scrollRef} className="hud-chat">
           {messages.length === 0 ? (
             <div className="hud-empty">No conversation yet. Type a message to begin.</div>
@@ -81,7 +82,7 @@ export default function ChatPanel({
           )}
         </div>
 
-        <div style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
+        <div className="hud-chat-input-row">
           <textarea
             ref={inputRef}
             className="pixel-input"

@@ -344,9 +344,8 @@ canvas {
 
 .hud-flyout__header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   padding: 10px 12px 8px;
   border-bottom: 1px solid var(--pixel-border);
   flex-shrink: 0;
@@ -354,17 +353,25 @@ canvas {
   background: rgba(0, 0, 0, 0.2);
 }
 
+.hud-flyout__top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .hud-flyout__title {
   font-size: 12px;
   font-weight: 600;
   color: var(--pixel-accent);
   text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 .hud-flyout__subtitle {
-  margin-top: 2px;
   font-size: 10px;
   color: var(--pixel-muted);
+  width: 100%;
 }
 
 .hud-flyout__body {
@@ -374,6 +381,39 @@ canvas {
   flex: 1 1 auto;
   font-size: 11px;
   line-height: 1.5;
+}
+
+.hud-flyout__body--chat {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.hud-chat-layout {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.hud-chat-layout .hud-chat {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px 8px;
+  max-height: none;
+}
+
+.hud-chat-input-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  flex-shrink: 0;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--pixel-border);
+  background: rgba(0, 0, 0, 0.15);
 }
 
 .hud-panel__stack {
