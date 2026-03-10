@@ -847,7 +847,7 @@ canvas {
 
 .seat-manager {
   width: min(1080px, 94vw);
-  height: min(620px, 80vh);
+  height: min(680px, 88vh);
   display: grid;
   grid-template-columns: 320px 1fr;
   grid-template-rows: auto 1fr;
