@@ -8,15 +8,15 @@ export interface MenuOption {
 
 const MENU_WIDTH = 160;
 const ITEM_HEIGHT = 24;
-const FONT_SIZE = "7px";
+const FONT_SIZE = "9px";
 const PAD_X = 10;
 const PAD_Y = 6;
-const BG_COLOR = 0x0a101e;
-const BG_ALPHA = 0.92;
-const BORDER_COLOR = 0x3b82f6;
-const HIGHLIGHT_COLOR = 0x1e3a5f;
-const TEXT_COLOR = "#e2e8f0";
-const DISABLED_COLOR = "#555e6e";
+const BG_COLOR = 0x252219;
+const BG_ALPHA = 0.96;
+const BORDER_COLOR = 0x4a4238;
+const HIGHLIGHT_COLOR = 0x322c24;
+const TEXT_COLOR = "#e8e2d8";
+const DISABLED_COLOR = "#a09888";
 const DEPTH = 30;
 
 export class InteractionMenu {
@@ -76,9 +76,9 @@ export class InteractionMenu {
 
     this.bg.clear();
     this.bg.fillStyle(BG_COLOR, BG_ALPHA);
-    this.bg.fillRoundedRect(0, 0, MENU_WIDTH, totalH, 4);
-    this.bg.lineStyle(2, BORDER_COLOR, 0.8);
-    this.bg.strokeRoundedRect(0, 0, MENU_WIDTH, totalH, 4);
+    this.bg.fillRoundedRect(0, 0, MENU_WIDTH, totalH, 2);
+    this.bg.lineStyle(2, BORDER_COLOR, 1);
+    this.bg.strokeRoundedRect(0, 0, MENU_WIDTH, totalH, 2);
 
     for (let i = 0; i < options.length; i++) {
       const opt = options[i];

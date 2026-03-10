@@ -126,9 +126,9 @@ export const PRESS_E_STYLE: {
 } = {
   fontFamily: '"Press Start 2P", monospace',
   fontSize: "8px",
-  color: "#facc15",
-  backgroundColor: "rgba(0,0,0,0.8)",
-  padding: { x: 6, y: 4 },
+  color: "#c9a227",
+  backgroundColor: "rgba(37, 34, 25, 0.95)",
+  padding: { x: 8, y: 4 },
   align: "center",
 };
 
