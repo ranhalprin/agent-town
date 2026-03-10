@@ -20,7 +20,8 @@ interface HudDockProps {
 
 export default function HudDock({ items, openPanel, onToggle, iconOverrides }: HudDockProps) {
   return (
-    <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 4 }}>
+    <div className="hud-dock-wrapper">
+    <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 2 }}>
       {items.map((item) => {
         const active = openPanel === item.id;
         const override = iconOverrides?.[item.id];
@@ -32,30 +33,32 @@ export default function HudDock({ items, openPanel, onToggle, iconOverrides }: H
             data-dock-id={item.id}
             onClick={() => onToggle(item.id)}
             title={item.label}
+            className={active ? "hud-dock-btn hud-dock-btn--active" : "hud-dock-btn"}
             style={{
               display: "block",
-              width: 42,
-              height: 42,
+              width: 36,
+              height: 36,
               padding: 0,
               border: "none",
               background: "transparent",
               cursor: "pointer",
               imageRendering: "pixelated",
-              transition: "transform 0.1s",
-              transform: active ? "translateY(1px)" : undefined,
+              transition: "transform 0.1s, filter 0.1s",
+              transform: active ? "scale(1.05)" : undefined,
             }}
           >
             <Image
               src={src}
               alt={item.label}
-              width={42}
-              height={42}
+              width={32}
+              height={32}
               style={{ imageRendering: "pixelated", display: "block" }}
               unoptimized
             />
           </button>
         );
       })}
+    </div>
     </div>
   );
 }

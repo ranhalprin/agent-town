@@ -175,7 +175,7 @@ export class OfficeScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
-    cam.setBackgroundColor("#1a1a2e");
+    cam.setBackgroundColor("#1a1814");
     cam.setRoundPixels(true);
     cam.setZoom(ZOOM_DEFAULT);
     cam.startFollow(this.player.sprite, true, CAMERA_LERP, CAMERA_LERP);

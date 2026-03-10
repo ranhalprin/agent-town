@@ -86,7 +86,7 @@ export default function GameHud() {
   return (
     <>
     <div className="hud-overlay">
-      <div className="hud-status-cluster pixel-panel">
+      <div className="hud-status-cluster">
         <div className="hud-status-cluster__row">
           <div className="hud-pill hud-pill--connection">
             <span
@@ -101,7 +101,7 @@ export default function GameHud() {
             <span>{STATUS_LABELS[state.connection]}</span>
           </div>
           <div className="hud-pill hud-pill--model" style={{ flex: "1 1 auto", overflow: "hidden" }}>
-            <Sparkles size={12} />
+            <Sparkles size={10} />
             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
               {formatModelLabel(state.sessionMetrics.model)}
             </span>
@@ -116,11 +116,11 @@ export default function GameHud() {
 
         <div className="hud-status-cluster__row">
           <div className="hud-pill hud-pill--metric">
-            <Users size={12} />
+            <Users size={10} />
             <span>{assignedSeats}/{totalSeats} seat</span>
           </div>
           <div className="hud-pill hud-pill--metric">
-            <Sparkles size={12} />
+            <Sparkles size={10} />
             <span>{workingCount}/{assignedSeats} busy</span>
           </div>
         </div>

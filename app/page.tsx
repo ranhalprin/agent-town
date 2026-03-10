@@ -15,13 +15,13 @@ export default function Page() {
     <ErrorBoundary>
       <StudioProvider>
         <main
-          className="flex w-screen h-screen overflow-hidden"
+          className="relative w-screen h-screen overflow-hidden"
           style={{ background: "var(--pixel-bg)" }}
         >
-          <div className="flex-1 min-w-0 h-full relative overflow-hidden">
+          <div className="absolute inset-0">
             <PhaserGame />
           </div>
-          <div className="w-80 shrink-0 h-full relative">
+          <div className="absolute inset-0 pointer-events-none">
             <GameHud />
           </div>
           <TerminalModal />

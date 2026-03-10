@@ -6,7 +6,7 @@ export default function MusicControls({ bgm }: { bgm: BgmState }) {
   const volumePercent = Math.round(bgm.volume * 100);
 
   return (
-    <div className="hud-music-bar pixel-panel">
+    <div className="hud-music-bar">
       <span className="hud-music-bar__label">♪</span>
       <input
         className="hud-music-bar__slider"
