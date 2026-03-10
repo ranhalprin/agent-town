@@ -61,6 +61,7 @@ Open [http://localhost:3000](http://localhost:3000).
 - **Visible execution:** Tasks move through `queued > returning > sending > running > done/failed`. Worker bubbles show what's happening at each step. Tool calls are collapsible in the chat panel.
 - **Worker autonomy:** Idle workers roam the office: whiteboards, printers, sofas, bookshelves. They return to their seat before starting real work. Busy workers queue additional tasks.
 - **Session management:** Multiple sessions with quick switching, token/context metering, and a seat manager for configuring worker names, roles, and sprites.
+- **Multi-agent team management:** Each seat can be a **Worker** or an **Agent**. Workers are tool slots — they execute tasks dispatched by the main agent. Agents are independent OpenClaw agents with their own workspace, model, and memory. Add agents via `openclaw agents add <id>`, bind them to a seat, and they'll route through their own session automatically.
 
 ## How it works
 
