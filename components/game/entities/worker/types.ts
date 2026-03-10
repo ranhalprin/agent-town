@@ -52,6 +52,7 @@ export interface WorkerCtx {
   // Task state
   _status: WorkerStatus;
   assignedRunId: string | null;
+  currentTaskMessage: string | null;
   taskQueue: QueuedTask[];
   taskVisualTimer: Phaser.Time.TimerEvent | null;
 

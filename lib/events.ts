@@ -4,7 +4,7 @@ import type { SeatDef } from "@/components/game/utils/MapHelpers";
 export interface GameEventMap {
   "seats-discovered": [seats: SeatDef[]];
   "seat-configs-updated": [seats: SeatState[]];
-  "task-assigned": [runId: string, message: string, seatId?: string];
+  "task-assigned": [taskId: string, message: string, seatId?: string, sessionKey?: string];
   "task-routed": [taskId: string, seatId: string, actorName: string];
   "task-ready": [taskId: string, message: string, seatId?: string];
   "task-bound": [taskId: string, runId: string];

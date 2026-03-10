@@ -467,6 +467,7 @@ canvas {
 .hud-chat__bubble,
 .hud-chat__tool,
 .hud-chat__system {
+  position: relative;
   border: 1px solid var(--pixel-border);
   padding: 10px 12px;
   font-size: 12px;
@@ -518,6 +519,24 @@ canvas {
 .hud-chat__system {
   background: rgba(255,255,255,0.03);
   color: var(--pixel-muted);
+}
+
+.hud-chat__stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-family: var(--pixel-font);
+  color: var(--pixel-red);
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid var(--pixel-red);
+  cursor: pointer;
+}
+
+.hud-chat__stop:hover {
+  background: rgba(239, 68, 68, 0.25);
 }
 
 .hud-list,

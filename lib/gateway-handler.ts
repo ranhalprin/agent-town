@@ -38,9 +38,14 @@ interface HandlerRefs {
   bubbleAccum: Map<string, string>;
   bubbleThrottleTimers: Map<string, ReturnType<typeof setTimeout>>;
   runActors: Map<string, string>;
+  stoppedRunIds: Set<string>;
   modelCatalog: { current: ModelChoice[] | null };
   sessionRefreshTimer: { current: ReturnType<typeof setTimeout> | null };
   taskCounter: { current: number };
+}
+
+function isRunStopped(refs: HandlerRefs, runId: string): boolean {
+  return refs.stoppedRunIds.has(runId) || findTask(refs.tasks(), runId)?.status === "stopped";
 }
 
 function resolveRunSessionKey(
@@ -245,8 +250,7 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
           refresh();
         }
       } else if (data.phase === "end") {
-        const existingTask = findTask(refs.tasks(), runId);
-        if (existingTask?.status === "stopped") {
+        if (isRunStopped(refs, runId)) {
           refs.seenStarts.delete(runId);
           refs.bubbleAccum.delete(runId);
           clearBubbleTimer(refs, runId);
@@ -273,8 +277,7 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
         });
         refresh(400);
       } else if (data.phase === "error") {
-        const existingTask = findTask(refs.tasks(), runId);
-        if (existingTask?.status === "stopped") {
+        if (isRunStopped(refs, runId)) {
           refs.seenStarts.delete(runId);
           refs.bubbleAccum.delete(runId);
           clearBubbleTimer(refs, runId);
@@ -303,6 +306,7 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
     }
 
     if (isToolData(stream, data)) {
+      if (isRunStopped(refs, runId)) return;
       const toolName = data.name ?? data.tool;
       if (toolName) {
         gameEvents.emit("task-bubble", runId, `🔧 ${toolName}`, 3000);
@@ -326,6 +330,7 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
     }
 
     if (isAssistantDelta(stream, data)) {
+      if (isRunStopped(refs, runId)) return;
       const delta = typeof data.delta === "string" ? data.delta : "";
       if (delta.length > 0) {
         const raw = (refs.bubbleAccum.get(runId) ?? "") + delta;
@@ -355,8 +360,7 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
 
     const eventState = p.state;
     if (eventState === "final") {
-      const existingTask = findTask(refs.tasks(), runId);
-      if (existingTask?.status === "stopped") {
+      if (isRunStopped(refs, runId)) {
         refresh(400);
         return;
       }
@@ -378,6 +382,7 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
       refresh(400);
     } else if (eventState === "error" || eventState === "aborted") {
       const stopped = eventState === "aborted";
+      const alreadyFinalized = isRunStopped(refs, runId);
       dispatch()({
         type: "UPDATE_TASK",
         taskId: runId,
@@ -385,15 +390,17 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
       });
       dispatch()({ type: "SET_SEAT_STATUS", runId, status: stopped ? "empty" : "failed" });
       gameEvents.emit(stopped ? "task-aborted" : "task-failed", runId);
-      dispatch()({
-        type: "APPEND_CHAT",
-        message: {
-          id: chatId(), runId, role: "system",
-          content: stopped ? "Task stopped" : "Task failed",
-          timestamp: new Date().toISOString(),
-          sessionKey: resolvedSessionKey,
-        },
-      });
+      if (!alreadyFinalized) {
+        dispatch()({
+          type: "APPEND_CHAT",
+          message: {
+            id: chatId(), runId, role: "system",
+            content: stopped ? "Task stopped" : "Task failed",
+            timestamp: new Date().toISOString(),
+            sessionKey: resolvedSessionKey,
+          },
+        });
+      }
       refresh(400);
     }
   });
@@ -402,8 +409,7 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
     const f = frame as GatewayFrame;
     const runId = (f.payload?.runId as string) ?? undefined;
     if (!runId) return;
-    const existingTask = findTask(refs.tasks(), runId);
-    if (existingTask?.status === "stopped") return;
+    if (isRunStopped(refs, runId)) return;
 
     const status = f.payload?.status as string | undefined;
     if (f.ok && (status === "ok" || status === "completed")) {

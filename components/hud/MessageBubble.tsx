@@ -1,9 +1,21 @@
 "use client";
 
+import { Square } from "lucide-react";
+import { gameEvents } from "@/lib/events";
 import type { ChatMessage } from "@/types/game";
 import ToolBubble from "./ToolBubble";
 
-export default function MessageBubble({ msg, actorName }: { msg: ChatMessage; actorName?: string }) {
+export default function MessageBubble({
+  msg,
+  actorName,
+  canStop,
+  onStop,
+}: {
+  msg: ChatMessage;
+  actorName?: string;
+  canStop?: boolean;
+  onStop?: () => void;
+}) {
   if (msg.role === "system") {
     return <div className="hud-chat__system">{msg.content}</div>;
   }
@@ -11,6 +23,10 @@ export default function MessageBubble({ msg, actorName }: { msg: ChatMessage; ac
   if (msg.role === "tool") {
     return <ToolBubble msg={msg} />;
   }
+
+  const handleStop = () => {
+    if (onStop) onStop();
+  };
 
   return (
     <div
@@ -23,6 +39,18 @@ export default function MessageBubble({ msg, actorName }: { msg: ChatMessage; ac
         {msg.content}
         {msg.streaming ? <span className="pixel-cursor">▌</span> : null}
       </div>
+      {canStop && msg.role === "user" && (
+        <button
+          type="button"
+          className="hud-chat__stop"
+          onClick={handleStop}
+          title="Stop task"
+          aria-label="Stop task"
+        >
+          <Square size={10} fill="currentColor" />
+          <span>Stop</span>
+        </button>
+      )}
     </div>
   );
 }

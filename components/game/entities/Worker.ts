@@ -1,6 +1,5 @@
 import * as Phaser from "phaser";
 import {
-  FRAME_WIDTH,
   FRAME_HEIGHT,
   makeAnims,
   type Direction,
@@ -65,11 +64,13 @@ export class Worker implements WorkerCtx {
   // Task state
   _status: WorkerStatus = "idle";
   assignedRunId: string | null = null;
+  currentTaskMessage: string | null = null;
   taskQueue: QueuedTask[] = [];
   taskVisualTimer: Phaser.Time.TimerEvent | null = null;
 
   // Internal
   private nameTag: Phaser.GameObjects.Text;
+  private taskStatusText: Phaser.GameObjects.Text;
   private statusDot: Phaser.GameObjects.Arc;
   private emoteSprite: Phaser.GameObjects.Sprite | null = null;
   private currentEmoteKey: string | null = null;
@@ -129,6 +130,19 @@ export class Worker implements WorkerCtx {
       0x888888,
     );
     this.statusDot.setDepth(20);
+
+    this.taskStatusText = scene.add
+      .text(x, nameY + 12, "", {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: "5px",
+        color: "#facc15",
+        backgroundColor: "rgba(0,0,0,0.8)",
+        padding: { x: 4, y: 2 },
+        align: "center",
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(20)
+      .setVisible(false);
 
     this.bubble = new ChatBubble(scene);
     this.initEmoteSprite();
@@ -365,6 +379,25 @@ export class Worker implements WorkerCtx {
       nameY + 4,
     );
 
+    const hasTask = this.assignedRunId || this.taskQueue.length > 0;
+    if (this.taskStatusText) {
+      this.taskStatusText.setPosition(this.sprite.x, nameY + 12);
+      if (hasTask) {
+        const parts: string[] = [];
+        if (this.currentTaskMessage) {
+          const snip = this.currentTaskMessage.length > 20 ? `${this.currentTaskMessage.slice(0, 20)}...` : this.currentTaskMessage;
+          parts.push(`📋 ${snip}`);
+        }
+        if (this.taskQueue.length > 0) {
+          parts.push(`Queue: ${this.taskQueue.length}`);
+        }
+        this.taskStatusText.setText(parts.join(" | "));
+        this.taskStatusText.setVisible(true);
+      } else {
+        this.taskStatusText.setVisible(false);
+      }
+    }
+
     if (this.emoteSprite) {
       this.emoteSprite.setPosition(
         this.sprite.x,
@@ -390,6 +423,7 @@ export class Worker implements WorkerCtx {
     if (this.emoteSprite) { this.emoteSprite.removeAllListeners(); this.emoteSprite.destroy(); this.emoteSprite = null; }
     this.sprite.destroy();
     this.nameTag.destroy();
+    this.taskStatusText.destroy();
     this.statusDot.destroy();
     this.bubble.destroy();
     this.pathfinder = null;

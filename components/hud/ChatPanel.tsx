@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SendHorizontal } from "lucide-react";
 import { useStudio } from "@/lib/store";
+import { gameEvents } from "@/lib/events";
 import type { ChatMessage, SessionRecord, TaskItem } from "@/types/game";
+import { findTask } from "@/lib/reducer";
 import HudFlyout from "./HudFlyout";
 import MessageBubble from "./MessageBubble";
 import SessionSwitcher from "./SessionSwitcher";
@@ -35,6 +37,10 @@ export default function ChatPanel({
     }
     return map;
   }, [tasks]);
+
+  const stopHandler = useCallback((runId: string, seatId: string) => {
+    gameEvents.emit("stop-task", runId, seatId);
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -72,13 +78,19 @@ export default function ChatPanel({
           {messages.length === 0 ? (
             <div className="hud-empty">No conversation yet. Type a message to begin.</div>
           ) : (
-            messages.map((message) => (
-              <MessageBubble
-                key={message.id}
-                msg={message}
-                actorName={actorByRunId.get(message.runId)}
-              />
-            ))
+            messages.map((message) => {
+              const task = findTask(tasks, message.runId);
+              const canStop = task?.status === "running" && (task.runId ?? task.taskId);
+              return (
+                <MessageBubble
+                  key={message.id}
+                  msg={message}
+                  actorName={actorByRunId.get(message.runId)}
+                  canStop={!!canStop}
+                  onStop={canStop ? () => stopHandler(task.runId ?? task.taskId, task.seatId ?? "") : undefined}
+                />
+              );
+            })
           )}
         </div>
 

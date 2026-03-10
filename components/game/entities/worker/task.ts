@@ -9,6 +9,7 @@ import type { WorkerCtx } from "./types";
 export function assignTask(ctx: WorkerCtx, runId: string, taskMessage: string, onReady?: () => void) {
   ctx.stopIdleActivity();
   ctx.assignedRunId = runId;
+  ctx.currentTaskMessage = taskMessage;
   ctx.setStatus("working");
 
   const beginProcessing = () => {
@@ -44,6 +45,7 @@ export function completeTask(ctx: WorkerCtx) {
     ctx.taskVisualTimer.destroy();
     ctx.taskVisualTimer = null;
   }
+  ctx.currentTaskMessage = null;
   ctx.setStatus("done");
 
   ctx.taskVisualTimer = ctx.scene.time.delayedCall(TASK_RESULT_HOLD_MS, () => {
@@ -61,6 +63,7 @@ export function failTask(ctx: WorkerCtx) {
     ctx.taskVisualTimer.destroy();
     ctx.taskVisualTimer = null;
   }
+  ctx.currentTaskMessage = null;
   ctx.setStatus("failed");
   ctx.showBubble("Task failed.", TASK_BUBBLE_MS);
   ctx.taskVisualTimer = ctx.scene.time.delayedCall(TASK_RESULT_HOLD_MS, () => {
@@ -83,6 +86,7 @@ export function abortTask(ctx: WorkerCtx, runId: string): boolean {
     return false;
   }
 
+  ctx.currentTaskMessage = null;
   if (ctx.taskVisualTimer) {
     ctx.taskVisualTimer.destroy();
     ctx.taskVisualTimer = null;

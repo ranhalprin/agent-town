@@ -59,6 +59,8 @@ export class OfficeScene extends Phaser.Scene {
 
   private workers: Worker[] = [];
   private runWorkerMap = new Map<string, Worker>();
+  /** sessionKey -> seatId: when a character executes a task, that session binds to the character */
+  private sessionBindings = new Map<string, string>();
   private seatDefs: SeatDef[] = [];
   private collisionGroup!: Phaser.Physics.Arcade.StaticGroup;
   private pathfinder!: Pathfinder;
@@ -437,27 +439,33 @@ export class OfficeScene extends Phaser.Scene {
       this.syncWorkers(seats);
     }));
 
-    this.gameEventUnsubs.push(gameEvents.on("task-assigned", (runId, message, seatId) => {
-      const worker = this.findWorkerBySeatId(seatId) ?? this.findIdleWorker();
+    this.gameEventUnsubs.push(gameEvents.on("task-assigned", (taskId, message, seatId, sessionKey) => {
+      // Route by explicit seatId, or by session binding (session -> character), or find idle worker
+      const boundSeatId = sessionKey ? this.sessionBindings.get(sessionKey) : undefined;
+      const targetSeatId = seatId ?? boundSeatId;
+      const worker = this.findWorkerBySeatId(targetSeatId) ?? this.findIdleWorker();
       if (!worker) {
-        gameEvents.emit("task-ready", runId, message, seatId);
+        gameEvents.emit("task-ready", taskId, message, seatId);
         return;
       }
-      gameEvents.emit("task-routed", runId, worker.seatId, worker.label);
-      if (seatId && worker.status === "working" && worker.assignedRunId) {
-        gameEvents.emit("task-staged", runId, "queued", worker.seatId);
-        worker.enqueueTask(runId, message, () => gameEvents.emit("task-ready", runId, message, worker.seatId));
-        this.runWorkerMap.set(runId, worker);
+      // Bind session to character when character gets the task
+      if (sessionKey) this.sessionBindings.set(sessionKey, worker.seatId);
+      gameEvents.emit("task-routed", taskId, worker.seatId, worker.label);
+      // When routed to this worker (explicit seat or session-bound) and they're busy: queue on worker
+      if (worker.status === "working" && worker.assignedRunId) {
+        gameEvents.emit("task-staged", taskId, "queued", worker.seatId);
+        worker.enqueueTask(taskId, message, () => gameEvents.emit("task-ready", taskId, message, worker.seatId));
+        this.runWorkerMap.set(taskId, worker);
         return;
       }
 
       if (worker.isAwayFromDesk()) {
-        gameEvents.emit("task-staged", runId, "returning", worker.seatId);
+        gameEvents.emit("task-staged", taskId, "returning", worker.seatId);
       }
 
-      const ready = () => gameEvents.emit("task-ready", runId, message, worker.seatId);
-      worker.assignTask(runId, message, ready);
-      this.runWorkerMap.set(runId, worker);
+      const ready = () => gameEvents.emit("task-ready", taskId, message, worker.seatId);
+      worker.assignTask(taskId, message, ready);
+      this.runWorkerMap.set(taskId, worker);
     }));
 
     this.gameEventUnsubs.push(gameEvents.on("task-bound", (taskId, runId) => {

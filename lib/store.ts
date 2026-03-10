@@ -90,6 +90,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   // Shared refs for gateway handler
   const seenStartsRef = useRef(new Set<string>());
+  const stoppedRunIdsRef = useRef(new Set<string>());
   const bubbleAccumRef = useRef(new Map<string, string>());
   const bubbleThrottleTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const runActorRef = useRef(new Map<string, string>());
@@ -120,6 +121,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       activeSessionKey: () => activeSessionKeyRef.current,
       setActiveSessionKey,
       seenStarts: seenStartsRef.current,
+      stoppedRunIds: stoppedRunIdsRef.current,
       bubbleAccum: bubbleAccumRef.current,
       bubbleThrottleTimers: bubbleThrottleTimersRef.current,
       runActors: runActorRef.current,
@@ -228,6 +230,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── Task routing via gateway ──
+  // Session queue: Openclaw doesn't allow same session multiple tasks in parallel. Queue on frontend.
+  const sessionQueueRef = useRef<Map<string, Array<{ taskId: string; message: string; seatId?: string }>>>(new Map());
 
   const sendTaskToGateway = useCallback((taskId: string, message: string, seatId?: string) => {
     const client = clientRef.current;
@@ -249,12 +253,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       });
     }
 
+    // Use chat.send (not agent) so chat.abort can stop the run — agent runs are not in chatAbortControllers
     client
-      .request("agent", {
-        message,
-        agentId: "main",
-        idempotencyKey: taskId,
+      .request("chat.send", {
         sessionKey,
+        message,
+        idempotencyKey: taskId,
       })
       .then((res: GatewayFrame) => {
         const runId = (res.payload?.runId as string) ?? undefined;
@@ -288,11 +292,51 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
+  const drainSessionQueue = useCallback(
+    (sessionKey: string) => {
+      const queue = sessionQueueRef.current.get(sessionKey);
+      if (!queue || queue.length === 0) return;
+      const next = queue.shift()!;
+      if (queue.length === 0) sessionQueueRef.current.delete(sessionKey);
+      sendTaskToGateway(next.taskId, next.message, next.seatId);
+    },
+    [sendTaskToGateway],
+  );
+
   useEffect(() => {
     return gameEvents.on("task-ready", (taskId, message, seatId) => {
+      const task = findTask(tasksRef.current, taskId);
+      const sessionKey = task?.sessionKey ?? activeSessionKeyRef.current ?? MAIN_SESSION_KEY;
+      const hasRunning = tasksRef.current.some(
+        (t) =>
+          t.sessionKey === sessionKey &&
+          t.taskId !== taskId &&
+          (t.status === "running" || t.status === "submitted")
+      );
+      if (hasRunning) {
+        const queue = sessionQueueRef.current.get(sessionKey) ?? [];
+        queue.push({ taskId, message, seatId });
+        sessionQueueRef.current.set(sessionKey, queue);
+        return;
+      }
       sendTaskToGateway(taskId, message, seatId);
     });
   }, [sendTaskToGateway]);
+
+  useEffect(() => {
+    const drain = (runId: string) => {
+      const task = findTask(tasksRef.current, runId);
+      if (task?.sessionKey) drainSessionQueue(task.sessionKey);
+    };
+    const unsubComplete = gameEvents.on("task-completed", drain);
+    const unsubFailed = gameEvents.on("task-failed", drain);
+    const unsubAborted = gameEvents.on("task-aborted", drain);
+    return () => {
+      unsubComplete();
+      unsubFailed();
+      unsubAborted();
+    };
+  }, [drainSessionQueue]);
 
   useEffect(() => {
     return gameEvents.on("task-routed", (taskId, seatId, actorName) => {
@@ -357,12 +401,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       type: "APPEND_CHAT",
       message: { id: chatId(), runId: taskId, role: "user", content: message, timestamp: new Date().toISOString(), sessionKey },
     });
-    gameEvents.emit("task-assigned", taskId, message, seatId);
+    gameEvents.emit("task-assigned", taskId, message, seatId, sessionKey);
   }, []);
 
   const finalizeStoppedTask = useCallback((runId: string, seatId?: string) => {
     const task = findTask(tasksRef.current, runId);
     if (!task || task.status === "stopped" || task.status === "completed") return;
+    stoppedRunIdsRef.current.add(task.runId ?? task.taskId);
     dispatchRef.current({
       type: "UPDATE_TASK", taskId: runId,
       patch: { status: "stopped", completedAt: new Date().toISOString(), result: task.result ?? "Stopped by user" },
@@ -397,9 +442,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // Optimistically finalize FIRST so we discard any in-flight gateway events (deltas, final)
+      finalizeStoppedTask(runId, seatId);
       try {
-        await client.request("agent.abort", { runId: task.runId, sessionKey: task.sessionKey }, 10000);
-        finalizeStoppedTask(runId, seatId);
+        await client.request("chat.abort", { sessionKey: task.sessionKey, runId: task.runId }, 10000);
       } catch {
         dispatchRef.current({
           type: "APPEND_CHAT",
