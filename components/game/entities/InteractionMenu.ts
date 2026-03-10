@@ -51,13 +51,13 @@ export class InteractionMenu {
 
     const kb = scene.input.keyboard;
     if (!kb) throw new Error("Keyboard plugin not available");
-    this.upKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.W);
-    this.downKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.S);
-    this.upArrow = kb.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
-    this.downArrow = kb.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
-    this.confirmKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.E);
-    this.enterKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-    this.escKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    this.upKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.W, false);
+    this.downKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.S, false);
+    this.upArrow = kb.addKey(Phaser.Input.Keyboard.KeyCodes.UP, false);
+    this.downArrow = kb.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN, false);
+    this.confirmKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.E, false);
+    this.enterKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER, false);
+    this.escKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ESC, false);
   }
 
   get visible(): boolean {

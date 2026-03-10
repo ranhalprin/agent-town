@@ -42,6 +42,13 @@ import {
 } from "@/lib/constants";
 import type { SeatState } from "@/types/game";
 
+function isInputFocused(): boolean {
+  const el = document.activeElement;
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || (el as HTMLElement).isContentEditable;
+}
+
 export class OfficeScene extends Phaser.Scene {
   private player!: Player;
   private terminalZone: { x: number; y: number } | null = null;
@@ -163,6 +170,8 @@ export class OfficeScene extends Phaser.Scene {
 
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     this.player.sprite.setCollideWorldBounds(true);
+
+    this.input.keyboard?.disableGlobalCapture();
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
@@ -593,21 +602,21 @@ export class OfficeScene extends Phaser.Scene {
 
     const kb = this.input.keyboard;
     if (!kb) return;
-    this.eKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.eKey = kb.addKey(Phaser.Input.Keyboard.KeyCodes.E, false);
   }
 
   // ── Update ─────────────────────────────────────────────
 
   update() {
-    // Update interaction menu even when it's open
     if (this.interactionMenu.visible) {
       this.interactionMenu.update();
       for (const worker of this.workers) worker.update();
       return;
     }
 
-    if (this.terminalOpen) {
+    if (this.terminalOpen || isInputFocused()) {
       for (const worker of this.workers) worker.update();
+      this.updateDoors();
       return;
     }
 

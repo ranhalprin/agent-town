@@ -33,12 +33,13 @@ export class Player {
     const kb = scene.input.keyboard;
     if (!kb) throw new Error("Keyboard plugin not available");
     this.cursors = kb.createCursorKeys();
+    kb.clearCaptures();
     this.wasd = kb.addKeys({
       W: Phaser.Input.Keyboard.KeyCodes.W,
       A: Phaser.Input.Keyboard.KeyCodes.A,
       S: Phaser.Input.Keyboard.KeyCodes.S,
       D: Phaser.Input.Keyboard.KeyCodes.D,
-    }) as Record<string, Phaser.Input.Keyboard.Key>;
+    }, false) as Record<string, Phaser.Input.Keyboard.Key>;
 
     this.sprite.anims.play(`idle-${this.facing}`);
   }
