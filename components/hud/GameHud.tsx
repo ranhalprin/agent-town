@@ -70,6 +70,10 @@ export default function GameHud() {
   );
 
   const togglePanel = useCallback((id: HudPanelId) => {
+    if (id === "workers") {
+      setSeatManagerOpen((prev) => !prev);
+      return;
+    }
     setOpenPanel((current) => (current === id ? null : id));
   }, []);
 

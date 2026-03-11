@@ -58,7 +58,8 @@ export type TaskStatus =
   | "running"
   | "stopped"
   | "completed"
-  | "failed";
+  | "failed"
+  | "interrupted";
 
 export interface TaskItem {
   taskId: string;

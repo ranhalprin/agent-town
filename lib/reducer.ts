@@ -154,7 +154,7 @@ export type Action =
   | { type: "SYNC_SEATS"; seats: SeatState[] }
   | { type: "UPDATE_SEAT_CONFIG"; seatId: string; patch: Partial<SeatState> }
   | { type: "RESET_SEATS" }
-  | { type: "RESTORE"; tasks: TaskItem[]; chatMessages: ChatMessage[]; sessions: SessionRecord[] }
+  | { type: "RESTORE"; tasks: TaskItem[]; chatMessages: ChatMessage[]; sessions: SessionRecord[]; activeSessionKey?: string }
   | { type: "NEW_SESSION"; session: SessionRecord }
   | { type: "SET_SESSIONS"; sessions: SessionRecord[] }
   | { type: "HYDRATE_SESSION_CHAT"; sessionKey: string; chatMessages: ChatMessage[] }
@@ -357,13 +357,17 @@ export function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
     case "RESET_SEATS":
       return { ...state, seats: resetSeatRuntime(state.seats) };
 
-    case "RESTORE":
+    case "RESTORE": {
+      // Keep in-flight tasks in their original status — the gateway may still be running them.
+      // A separate timeout will mark stale tasks as interrupted if no events arrive.
       return {
         ...state,
         tasks: action.tasks,
         chatMessages: action.chatMessages.filter((m) => !isRedundantConnectionMessage(m)),
         sessions: action.sessions,
+        activeSessionKey: action.activeSessionKey ?? state.activeSessionKey,
       };
+    }
 
     case "NEW_SESSION": {
       const existingSessions = state.sessions.filter((s) => s.key !== action.session.key);

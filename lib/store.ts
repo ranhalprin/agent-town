@@ -103,6 +103,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const setActiveSessionKey = useCallback((sessionKey?: string) => {
     activeSessionKeyRef.current = sessionKey;
+    saveActiveSessionKey(sessionKey);
     dispatchRef.current({ type: "SET_ACTIVE_SESSION", sessionKey });
   }, []);
 
@@ -172,29 +173,89 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     const sessions = loadSessions();
     const seatConfigs = loadSeatConfigs();
     seatConfigRef.current = seatConfigs;
-    if (savedActiveKey) {
-      activeSessionKeyRef.current = savedActiveKey;
+    const hasRestoredData = tasks.length > 0 || chat.length > 0 || sessions.length > 0;
+    // Always set the ref so gateway handler doesn't override with a different key
+    activeSessionKeyRef.current = savedActiveKey ?? (hasRestoredData ? MAIN_SESSION_KEY : undefined);
+    if (hasRestoredData) {
+      dispatch({ type: "RESTORE", tasks, chatMessages: chat, sessions, activeSessionKey: fallbackSessionKey });
     }
-    if (tasks.length > 0 || chat.length > 0 || sessions.length > 0) {
-      dispatch({ type: "RESTORE", tasks, chatMessages: chat, sessions });
-    }
-    if (savedActiveKey) {
-      dispatch({ type: "SET_ACTIVE_SESSION", sessionKey: savedActiveKey });
+    if (activeSessionKeyRef.current) {
+      dispatch({ type: "SET_ACTIVE_SESSION", sessionKey: activeSessionKeyRef.current });
+      saveActiveSessionKey(activeSessionKeyRef.current);
     }
 
+    // Pre-populate seenStarts with runIds of in-flight tasks so gateway handler
+    // processes subsequent events (tool, assistant delta) correctly.
+    const inflightTasks = tasks.filter(
+      (t) => t.status === "running" || t.status === "submitted" || t.status === "returning",
+    );
+    for (const t of inflightTasks) {
+      if (t.runId) seenStartsRef.current.add(t.runId);
+      seenStartsRef.current.add(t.taskId);
+      // Restore actor names so bubbles/chat show the right label
+      if (t.actorName && t.runId) runActorRef.current.set(t.runId, t.actorName);
+    }
+
+    // When seats are discovered from the map, re-bind any in-flight tasks to their seats
     const unsubSeats = gameEvents.on("seats-discovered", (discovered) => {
       const mergedSeats = mergeDiscoveredSeats(discovered, seatConfigRef.current, seatsRef.current);
       dispatchRef.current({ type: "SYNC_SEATS", seats: mergedSeats });
+
+      // Re-bind running tasks to seats after discovery
+      for (const task of tasksRef.current) {
+        if (
+          task.seatId &&
+          (task.status === "running" || task.status === "submitted" || task.status === "returning")
+        ) {
+          dispatchRef.current({
+            type: "PATCH_SEAT_RUNTIME",
+            seatId: task.seatId,
+            patch: {
+              status: task.status === "returning" ? "returning" : "running",
+              runId: task.runId ?? task.taskId,
+              taskSnippet: task.message.slice(0, 28),
+              startedAt: task.createdAt,
+            },
+          });
+        }
+      }
     });
+
+    // Stale task timeout: if no gateway events arrive for a restored in-flight task
+    // within 20 seconds after reconnect, mark it as interrupted.
+    let staleTimer: ReturnType<typeof setTimeout> | undefined;
+    if (inflightTasks.length > 0) {
+      staleTimer = setTimeout(() => {
+        for (const t of inflightTasks) {
+          const current = findTask(tasksRef.current, t.taskId);
+          if (current && (current.status === "running" || current.status === "submitted" || current.status === "returning")) {
+            // Check if the task has received any new content since restore
+            // by comparing the runId — if it's still the same, likely stale
+            dispatchRef.current({
+              type: "UPDATE_TASK",
+              taskId: current.taskId,
+              patch: { status: "interrupted", completedAt: new Date().toISOString() },
+            });
+            if (current.runId) {
+              dispatchRef.current({ type: "SET_SEAT_STATUS", runId: current.runId, status: "empty" });
+            }
+          }
+        }
+      }, 20_000);
+    }
 
     if (savedConfig?.url) {
       const t = setTimeout(() => connectImpl(savedConfig), 80);
       return () => {
         clearTimeout(t);
+        if (staleTimer) clearTimeout(staleTimer);
         unsubSeats();
       };
     }
-    return unsubSeats;
+    return () => {
+      if (staleTimer) clearTimeout(staleTimer);
+      unsubSeats();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

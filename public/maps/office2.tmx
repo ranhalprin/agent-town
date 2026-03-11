@@ -185,8 +185,8 @@
   <object id="163" gid="1175" x="823.351" y="596.105" width="48" height="48"/>
   <object id="169" gid="1123" x="1051.13" y="550.563" width="48" height="48"/>
   <object id="170" gid="1139" x="1051.13" y="598.419" width="48" height="48"/>
-  <object id="171" gid="1124" x="1097.98" y="548.596" width="48" height="48"/>
-  <object id="172" gid="1140" x="1097.98" y="596.453" width="48" height="48"/>
+  <object id="171" gid="1124" x="1098.98" y="548.596" width="48" height="48"/>
+  <object id="172" gid="1140" x="1098.98" y="596.453" width="48" height="48"/>
   <object id="173" gid="1153" x="823.8" y="552.149" width="48" height="48"/>
   <object id="174" gid="1158" x="1011.77" y="548.763" width="48" height="48"/>
   <object id="175" gid="1174" x="1011.77" y="596.823" width="48" height="48"/>
@@ -285,7 +285,6 @@
   <object id="294" x="94.009" y="576.861" width="385.109" height="15.2439"/>
   <object id="297" x="172.635" y="578.466" width="306.483" height="91.4634"/>
   <object id="298" x="146.229" y="237.514" width="44.3951" height="27.7469"/>
-  <object id="299" x="973.09" y="253.052"/>
   <object id="300" x="1138.87" y="238.151" width="61.2831" height="23.2721"/>
  </objectgroup>
  <objectgroup id="11" name="pois">
@@ -369,7 +368,7 @@
    </properties>
    <point/>
   </object>
-  <object id="275" name="seat6" x="503.97" y="459.396">
+  <object id="275" name="seat6" x="503.581" y="459.396">
    <point/>
   </object>
  </objectgroup>
