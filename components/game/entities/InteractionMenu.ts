@@ -6,9 +6,9 @@ export interface MenuOption {
   action: () => void;
 }
 
-const MENU_WIDTH = 160;
-const ITEM_HEIGHT = 24;
-const FONT_SIZE = "9px";
+const MENU_WIDTH = 200;
+const ITEM_HEIGHT = 30;
+const FONT_SIZE = "14px";
 const PAD_X = 10;
 const PAD_Y = 6;
 const BG_COLOR = 0x252219;
@@ -79,9 +79,9 @@ export class InteractionMenu {
 
     this.bg.clear();
     this.bg.fillStyle(BG_COLOR, BG_ALPHA);
-    this.bg.fillRoundedRect(0, 0, MENU_WIDTH, totalH, 2);
+    this.bg.fillRoundedRect(0, 0, MENU_WIDTH, totalH, 6);
     this.bg.lineStyle(2, BORDER_COLOR, 1);
-    this.bg.strokeRoundedRect(0, 0, MENU_WIDTH, totalH, 2);
+    this.bg.strokeRoundedRect(0, 0, MENU_WIDTH, totalH, 6);
 
     for (let i = 0; i < options.length; i++) {
       const opt = options[i];
@@ -92,18 +92,21 @@ export class InteractionMenu {
       const w = MENU_WIDTH - 4;
       const h = ITEM_HEIGHT - 2;
       highlight.fillStyle(HIGHLIGHT_FILL, HIGHLIGHT_ALPHA);
-      highlight.fillRect(-w / 2, -h / 2, w, h);
+      highlight.fillRoundedRect(-w / 2, -h / 2, w, h, 4);
       highlight.lineStyle(2, HIGHLIGHT_BORDER, 0.95);
-      highlight.strokeRect(-w / 2, -h / 2, w, h);
+      highlight.strokeRoundedRect(-w / 2, -h / 2, w, h, 4);
       highlight.setVisible(false);
       this.highlights.push(highlight);
       this.container.add(highlight);
 
-      const txt = this.scene.add.text(PAD_X, y + 4, opt.label, {
-        fontFamily: '"Press Start 2P", "ArkPixel", monospace',
+      const txt = this.scene.add.text(PAD_X, y + ITEM_HEIGHT / 2, opt.label, {
+        fontFamily: '"SF Mono", "Cascadia Code", Consolas, "Liberation Mono", Menlo, monospace',
         fontSize: FONT_SIZE,
         color: opt.enabled ? TEXT_COLOR : DISABLED_COLOR,
       });
+      txt.setResolution(window.devicePixelRatio * 2);
+      txt.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
+      txt.setOrigin(0, 0.5);
       this.items.push(txt);
       this.container.add(txt);
 

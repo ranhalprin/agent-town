@@ -121,6 +121,7 @@ export default function TerminalModal() {
               marginBottom: "12px",
               padding: "6px",
               border: "2px solid var(--pixel-red)",
+              borderRadius: "var(--pixel-radius-sm)",
             }}
           >
             Not connected. Use the HUD to connect first.

@@ -24,7 +24,7 @@
   --pixel-text: #e8e2d8;
   --pixel-muted: #a09888;
   --pixel-font: var(--font-pixel), "ArkPixel", monospace;
-  --pixel-font-chat: "ArkPixel", monospace;
+  --pixel-font-chat: "SF Mono", "Cascadia Code", Consolas, "Liberation Mono", Menlo, monospace;
   --pixel-radius: 8px;
   --pixel-radius-sm: 6px;
   --pixel-radius-lg: 12px;
@@ -38,6 +38,7 @@ canvas {
 .pixel-panel {
   background: var(--pixel-panel);
   border: 3px solid var(--pixel-border);
+  border-radius: var(--pixel-radius-lg);
   color: var(--pixel-text);
   font-family: var(--pixel-font);
   font-size: 10px;
@@ -55,6 +56,8 @@ canvas {
   cursor: pointer;
   text-transform: uppercase;
   transition: background 0.1s, border-color 0.1s;
+  outline: none;
+  border-radius: var(--pixel-radius-sm);
 }
 
 .pixel-button:hover:not(:disabled) {
@@ -79,26 +82,21 @@ canvas {
 }
 
 .pixel-input {
-  font-family: "ArkPixel", monospace;
-  font-size: 12px;
+  font-family: var(--pixel-font-chat);
+  font-size: 13px;
   padding: 8px 12px;
   border: 1px solid var(--pixel-border);
+  border-radius: var(--pixel-radius-sm);
   background: var(--pixel-bg);
   color: var(--pixel-text);
   resize: vertical;
   width: 100%;
   min-height: 60px;
-  -webkit-font-smoothing: none;
-  font-smooth: never;
-  text-rendering: optimizeSpeed;
-  text-shadow: 0.5px 0 0 currentColor;
 }
 
 .pixel-input::placeholder {
-  font-family: "ArkPixel", monospace;
-  font-size: 12px;
-  -webkit-font-smoothing: none;
-  font-smooth: never;
+  font-family: var(--pixel-font-chat);
+  font-size: 13px;
 }
 
 .pixel-input:focus {
@@ -149,6 +147,7 @@ canvas {
   padding: 0;
   font-family: sans-serif;
   transition: background 0.1s, border-color 0.1s;
+  border-radius: var(--pixel-radius-sm);
 }
 
 .pixel-icon-btn:hover:not(:disabled) {
@@ -527,15 +526,13 @@ canvas {
 .hud-chat__system {
   position: relative;
   border: 1px solid var(--pixel-border);
+  border-radius: var(--pixel-radius-sm);
   padding: 10px 12px;
-  font-size: 12px;
-  line-height: 1.7;
+  font-size: 13px;
+  line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: "ArkPixel", monospace;
-  text-rendering: optimizeSpeed;
-  -webkit-font-smoothing: none;
-  font-smooth: never;
+  font-family: var(--pixel-font-chat);
   color: var(--pixel-text);
 }
 
@@ -549,12 +546,18 @@ canvas {
   border-color: var(--pixel-border);
 }
 
+.hud-chat__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
 .hud-chat__role,
 .hud-chat__tool-name {
-  margin-bottom: 6px;
   color: var(--pixel-accent);
   font-family: var(--pixel-font);
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 600;
   line-height: 1.4;
 }
@@ -569,9 +572,7 @@ canvas {
   margin-top: 8px;
   font-size: 12px;
   color: var(--pixel-green);
-  font-family: "ArkPixel", monospace;
-  -webkit-font-smoothing: none;
-  font-smooth: never;
+  font-family: var(--pixel-font-chat);
 }
 
 .hud-chat__system {
@@ -582,14 +583,17 @@ canvas {
 .hud-chat__stop {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 8px;
-  padding: 4px 8px;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  flex-shrink: 0;
   font-size: 10px;
   font-family: var(--pixel-font);
   color: var(--pixel-red);
   background: rgba(239, 68, 68, 0.15);
   border: 1px solid var(--pixel-red);
+  border-radius: 50%;
   cursor: pointer;
 }
 
@@ -610,6 +614,7 @@ canvas {
 .hud-list__item,
 .hud-workers__item {
   border: 1px solid var(--pixel-border);
+  border-radius: var(--pixel-radius-sm);
   background: rgba(0, 0, 0, 0.35);
   padding: 8px 10px;
   color: var(--pixel-text);
@@ -641,6 +646,7 @@ canvas {
   min-width: 68px;
   padding: 2px 6px;
   border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--pixel-radius-sm);
   text-transform: uppercase;
 }
 
@@ -821,6 +827,7 @@ canvas {
   transition: border-color 0.15s, background 0.15s;
   flex-shrink: 0;
   pointer-events: auto;
+  outline: none;
 }
 
 .topbar-agent-pill:hover {
@@ -1063,6 +1070,7 @@ canvas {
   overflow-y: auto;
   background: var(--pixel-bg);
   border: 2px solid var(--pixel-border);
+  border-radius: var(--pixel-radius);
   z-index: 50;
   font-family: var(--pixel-font);
   font-size: 8px;
@@ -1124,6 +1132,7 @@ canvas {
   pointer-events: auto;
   background: var(--pixel-panel);
   border: 1px solid var(--pixel-border);
+  border-radius: var(--pixel-radius-lg);
   box-shadow: 4px 4px 24px rgba(0,0,0,0.5);
   color: var(--pixel-text);
 }
@@ -1140,6 +1149,7 @@ canvas {
 
 .seat-manager__portrait-frame {
   border: 2px solid var(--pixel-border);
+  border-radius: var(--pixel-radius-sm);
   background: var(--pixel-bg);
   display: flex;
   align-items: center;
@@ -1170,6 +1180,7 @@ canvas {
   width: 100%;
   height: 120px;
   border: 2px solid var(--pixel-border);
+  border-radius: var(--pixel-radius-sm);
   background: var(--pixel-bg);
   display: flex;
   align-items: center;
@@ -1179,6 +1190,7 @@ canvas {
 
 .seat-card {
   border: 2px solid var(--pixel-border);
+  border-radius: var(--pixel-radius);
   background: rgba(26, 21, 16, 0.6);
   padding: 10px;
   text-align: left;
@@ -1202,6 +1214,7 @@ canvas {
   font-size: 7px;
   padding: 4px 6px;
   background: rgba(255,255,255,0.06);
+  border-radius: var(--pixel-radius-sm);
   flex-shrink: 0;
 }
 
@@ -1217,6 +1230,7 @@ canvas {
 
 .seat-hint {
   border: 2px solid var(--pixel-border);
+  border-radius: var(--pixel-radius);
   background: rgba(26, 21, 16, 0.5);
   padding: 10px;
   font-size: 8px;
@@ -1287,6 +1301,7 @@ canvas {
   gap: 20px;
   animation: onboarding-slide-up 0.35s ease;
   border: 1px solid var(--pixel-border);
+  border-radius: var(--pixel-radius-lg);
   background: var(--pixel-panel);
   box-shadow: 4px 4px 24px rgba(0,0,0,0.5);
   color: var(--pixel-text);
@@ -1306,6 +1321,7 @@ canvas {
   width: 10px;
   height: 10px;
   border: 2px solid var(--pixel-border);
+  border-radius: 50%;
   background: transparent;
 }
 
@@ -1413,6 +1429,7 @@ canvas {
   gap: 12px;
   padding: 10px 12px;
   border: 1px solid var(--pixel-border);
+  border-radius: var(--pixel-radius-sm);
   background: rgba(0, 0, 0, 0.35);
   font-family: "ArkPixel", monospace;
   font-size: 12px;

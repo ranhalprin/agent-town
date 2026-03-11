@@ -16,9 +16,9 @@ interface TopBarProps {
 
 function seatDotColor(seat: SeatState): string {
   if (!seat.assigned) return "gray";
-  if (seat.status === "running" || seat.status === "returning") return "green";
+  if (seat.status === "running" || seat.status === "returning") return "yellow";
   if (seat.status === "failed") return "red";
-  return "yellow";
+  return "green";
 }
 
 export default function TopBar({

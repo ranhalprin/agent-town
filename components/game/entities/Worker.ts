@@ -114,7 +114,7 @@ export class Worker implements WorkerCtx {
     this.nameTag = scene.add
       .text(x, nameY, label, {
         fontFamily: '"Press Start 2P", monospace',
-        fontSize: "6px",
+        fontSize: "8px",
         color: "#e0e0e0",
         backgroundColor: "rgba(0,0,0,0.7)",
         padding: { x: 4, y: 2 },
@@ -134,7 +134,7 @@ export class Worker implements WorkerCtx {
     this.taskStatusText = scene.add
       .text(x, nameY + 12, "", {
         fontFamily: '"Press Start 2P", monospace',
-        fontSize: "5px",
+        fontSize: "7px",
         color: "#facc15",
         backgroundColor: "rgba(0,0,0,0.8)",
         padding: { x: 4, y: 2 },

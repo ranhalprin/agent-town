@@ -110,7 +110,7 @@ export const BOSS_PROMPT_OFFSET_X = 40;
 export const BOSS_PROMPT_OFFSET_Y = 16;
 export const CAMERA_LERP = 0.1;
 export const ZOOM_SENSITIVITY = 0.001;
-export const ZOOM_DEFAULT = 1;
+export const ZOOM_DEFAULT = 0.82;
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 2;
 export const CAMERA_DRAG_THRESHOLD = 3;
@@ -124,8 +124,8 @@ export const PRESS_E_STYLE: {
   padding: { x: number; y: number };
   align: string;
 } = {
-  fontFamily: '"Press Start 2P", monospace',
-  fontSize: "8px",
+  fontFamily: '"SF Mono", "Cascadia Code", Consolas, "Liberation Mono", Menlo, monospace',
+  fontSize: "14px",
   color: "#c9a227",
   backgroundColor: "rgba(37, 34, 25, 0.95)",
   padding: { x: 8, y: 4 },

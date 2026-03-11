@@ -175,12 +175,17 @@ export class OfficeScene extends Phaser.Scene {
 
     this.input.keyboard?.disableGlobalCapture();
 
+    this.mapWidth = map.widthInPixels;
+    this.mapHeight = map.heightInPixels;
+
     const cam = this.cameras.main;
-    cam.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     cam.setBackgroundColor("#1a1814");
     cam.setRoundPixels(true);
     cam.setZoom(ZOOM_DEFAULT);
+    this.updateCameraBounds();
     cam.startFollow(this.player.sprite, true, CAMERA_LERP, CAMERA_LERP);
+
+    this.scale.on("resize", () => this.updateCameraBounds());
 
     const canvas = this.game.canvas;
     const onWheel = (e: WheelEvent) => {
@@ -195,11 +200,13 @@ export class OfficeScene extends Phaser.Scene {
         const sy = e.offsetY / cam.scaleManager.displayScale.y;
         const worldBefore = cam.getWorldPoint(sx, sy);
         cam.setZoom(newZoom);
+        this.updateCameraBounds();
         const worldAfter = cam.getWorldPoint(sx, sy);
         cam.scrollX += worldBefore.x - worldAfter.x;
         cam.scrollY += worldBefore.y - worldAfter.y;
       } else {
         cam.setZoom(newZoom);
+        this.updateCameraBounds();
       }
     };
     canvas.addEventListener("wheel", onWheel, { passive: false });
@@ -223,6 +230,8 @@ export class OfficeScene extends Phaser.Scene {
 
   private cameraDragging = false;
   private cameraFollowing = true;
+  private mapWidth = 0;
+  private mapHeight = 0;
 
   private initCameraDrag(cam: Phaser.Cameras.Scene2D.Camera) {
     let lastX = 0;
@@ -264,6 +273,22 @@ export class OfficeScene extends Phaser.Scene {
       this.cameras.main.startFollow(this.player.sprite, true, CAMERA_LERP, CAMERA_LERP);
       this.cameraFollowing = true;
     }
+  }
+
+  /** Recalculate camera bounds so the map is centered when viewport > map at current zoom. */
+  private updateCameraBounds() {
+    const cam = this.cameras.main;
+    const viewW = cam.width / cam.zoom;
+    const viewH = cam.height / cam.zoom;
+    const mw = this.mapWidth;
+    const mh = this.mapHeight;
+
+    const bx = viewW > mw ? -(viewW - mw) / 2 : 0;
+    const by = viewH > mh ? -(viewH - mh) / 2 : 0;
+    const bw = viewW > mw ? viewW : mw;
+    const bh = viewH > mh ? viewH : mh;
+
+    cam.setBounds(bx, by, bw, bh);
   }
 
   // ── Workers ──────────────────────────────────────────────
@@ -351,9 +376,11 @@ export class OfficeScene extends Phaser.Scene {
   private initInteractionUI() {
     this.workerPromptText = this.add
       .text(0, 0, "Press E", PRESS_E_STYLE as Phaser.Types.GameObjects.Text.TextStyle)
+      .setResolution(window.devicePixelRatio * 2)
       .setOrigin(0.5, 1)
       .setDepth(25)
       .setVisible(false);
+    this.workerPromptText.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
 
     this.interactionMenu = new InteractionMenu(this);
     this.interactionMenu.onClose = () => {
@@ -620,9 +647,11 @@ export class OfficeScene extends Phaser.Scene {
 
     this.promptText = this.add
       .text(bossSpawn.x + BOSS_PROMPT_OFFSET_X, bossSpawn.y - BOSS_PROMPT_OFFSET_Y, "Press E", PRESS_E_STYLE as Phaser.Types.GameObjects.Text.TextStyle)
+      .setResolution(window.devicePixelRatio * 2)
       .setOrigin(0, 0)
       .setDepth(20)
       .setVisible(false);
+    this.promptText.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
 
     const kb = this.input.keyboard;
     if (!kb) return;
