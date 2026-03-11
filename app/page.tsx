@@ -19,10 +19,12 @@ export default function Page() {
           className="relative w-screen h-screen overflow-hidden"
           style={{ background: "var(--pixel-bg)" }}
         >
+          {/* Game canvas — full screen background */}
           <div className="absolute inset-0">
             <PhaserGame />
           </div>
-          <div className="absolute inset-0 pointer-events-none">
+          {/* HUD overlay — floating UI on top */}
+          <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 20 }}>
             <GameHud />
           </div>
           <TerminalModal />

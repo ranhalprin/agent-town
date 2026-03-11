@@ -6,12 +6,15 @@ interface ContextMeterProps {
   usedTokens?: number;
   maxTokens?: number;
   fresh: boolean;
+  /** Inline single-row variant for bottom bar */
+  inline?: boolean;
 }
 
 export default function ContextMeter({
   usedTokens,
   maxTokens,
   fresh,
+  inline = false,
 }: ContextMeterProps) {
   const hasValues =
     typeof usedTokens === "number" &&
@@ -29,6 +32,28 @@ export default function ContextMeter({
       : remaining > 0.2
         ? "linear-gradient(90deg, #b8860b, #facc15)"
         : "linear-gradient(90deg, #a61123, #ef4444)";
+
+  if (inline) {
+    return (
+      <div className="hud-meter-inline">
+        <span className="hud-meter-inline__label">CTX</span>
+        <div className="hud-meter-inline__bar">
+          <div
+            style={{
+              width: `${remainPct}%`,
+              height: "100%",
+              background: barColor,
+              transition: "width 0.4s ease, background 0.4s ease",
+            }}
+          />
+        </div>
+        <span className="hud-meter-inline__value">
+          {hasValues ? `${remainPct}%` : "--"}
+          {!fresh && " ?"}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="hud-meter hud-meter--compact">
