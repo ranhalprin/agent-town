@@ -20,7 +20,7 @@ Your agents deserve more than a terminal. Give them an office, a town, and event
 
 ## Demo
 
-[Watch the demo video](https://github.com/user-attachments/assets/81d4564f-8dee-4c62-9dda-5df44583b87c)
+[Watch the demo video](https://github.com/user-attachments/assets/03801c8c-44a5-4b14-96cf-db9e941acf86)
 
 ## What is this?
 
@@ -75,12 +75,12 @@ You approach a worker -> Press E -> Assign a task
 
 ## Tech stack
 
-| Layer | Choice |
-| --- | --- |
-| App | Next.js 16, React 19, TypeScript |
-| Game | Phaser 3, Tiled maps, pixel sprite sheets |
+| Layer         | Choice                                                                    |
+| ------------- | ------------------------------------------------------------------------- |
+| App           | Next.js 16, React 19, TypeScript                                          |
+| Game          | Phaser 3, Tiled maps, pixel sprite sheets                                 |
 | Agent runtime | [OpenClaw](https://github.com/openclaw/openclaw) via standalone connector |
-| State | React context + reducer + typed event bus |
+| State         | React context + reducer + typed event bus                                 |
 
 ## Architecture
 
