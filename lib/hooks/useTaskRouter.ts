@@ -20,7 +20,7 @@ export interface TaskRouterRefs {
   seatIdToSessionKey: MutableRefObject<Map<string, string>>;
   stoppedRunIds: MutableRefObject<Set<string>>;
   runActors: MutableRefObject<Map<string, string>>;
-  taskCounter: MutableRefObject<number>;
+  nextTaskId: () => string;
 }
 
 export function useTaskRouter(refs: TaskRouterRefs) {
@@ -112,7 +112,7 @@ export function useTaskRouter(refs: TaskRouterRefs) {
       const client = refs.clientRef.current;
       if (!client || client.status !== "connected") return;
 
-      const taskId = `aw_task_${++refs.taskCounter.current}_${Date.now()}`;
+      const taskId = refs.nextTaskId();
       const sessionKey = refs.activeSessionKey.current ?? MAIN_SESSION_KEY;
       const actorName = seatId ? resolveSeatLabelForTask(refs.seats.current, seatId) : undefined;
 

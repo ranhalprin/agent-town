@@ -10,8 +10,6 @@ import type { TaskItem, SeatState, ChatMessage, SessionRecord } from "@/types/ga
 import type { GatewayClient } from "./gateway";
 import type { Action } from "./reducer";
 import {
-  type AgentEventPayload,
-  type ChatEventPayload,
   type GatewayFrame,
   type SessionsListPayload,
   type SessionsPreviewPayload,
@@ -24,7 +22,7 @@ import {
   isAssistantDelta,
 } from "./gateway-types";
 import { gameEvents } from "./events";
-import { chatId, findTask, MAIN_SESSION_KEY, resolveSeatLabelForTask } from "./reducer";
+import { chatId, findTask, MAIN_SESSION_KEY } from "./reducer";
 import { createLogger } from "./logger";
 
 const log = createLogger("Gateway");

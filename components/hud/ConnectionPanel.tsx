@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useStudio } from "@/lib/store";
 import { LS_CONFIG, STATUS_LABELS } from "@/lib/constants";
 import { parseGatewayAddress } from "@/lib/utils";
@@ -9,21 +9,24 @@ import HudFlyout from "./HudFlyout";
 const DEFAULT_GATEWAY = "ws://127.0.0.1:18789";
 const DEFAULT_TOKEN = process.env.NEXT_PUBLIC_GATEWAY_TOKEN ?? "";
 
+function loadSavedConfig(): { url: string; token: string } {
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem(LS_CONFIG) : null;
+    if (raw) {
+      const parsed = JSON.parse(raw) as { url?: string; token?: string };
+      return {
+        url: parsed.url || DEFAULT_GATEWAY,
+        token: parsed.token || DEFAULT_TOKEN,
+      };
+    }
+  } catch {}
+  return { url: DEFAULT_GATEWAY, token: DEFAULT_TOKEN };
+}
+
 export default function ConnectionPanel() {
   const { state, connect, disconnect } = useStudio();
-  const [url, setUrl] = useState(DEFAULT_GATEWAY);
-  const [token, setToken] = useState(DEFAULT_TOKEN);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LS_CONFIG);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { url?: string; token?: string };
-        if (parsed.url) setUrl(parsed.url);
-        if (parsed.token) setToken(parsed.token);
-      }
-    } catch {}
-  }, []);
+  const [url, setUrl] = useState(() => loadSavedConfig().url);
+  const [token, setToken] = useState(() => loadSavedConfig().token);
   const isConnected = state.connection === "connected";
   const isConnecting = state.connection === "connecting";
   const isAuthFailed = state.connection === "auth_failed";

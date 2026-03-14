@@ -16,6 +16,7 @@ export interface SessionRefs {
   dispatch: MutableRefObject<Dispatch<Action>>;
   clientRef: MutableRefObject<GatewayClient | null>;
   activeSessionKey: MutableRefObject<string | undefined>;
+  setActiveSessionKey: (key: string | undefined) => void;
   seenStarts: MutableRefObject<Set<string>>;
   bubbleAccum: MutableRefObject<Map<string, string>>;
   stoppedRunIds: MutableRefObject<Set<string>>;
@@ -41,7 +42,7 @@ export function useSession(refs: SessionRefs) {
 
     clearTransientState();
     refs.dispatch.current({ type: "NEW_SESSION", session: record });
-    refs.activeSessionKey.current = newKey;
+    refs.setActiveSessionKey(newKey);
     saveActiveSessionKey(newKey);
   }, [refs, clearTransientState]);
 
@@ -53,7 +54,7 @@ export function useSession(refs: SessionRefs) {
       saveActiveSessionKey(sessionKey);
 
       refs.dispatch.current({ type: "SWITCH_SESSION", sessionKey });
-      refs.activeSessionKey.current = sessionKey;
+      refs.setActiveSessionKey(sessionKey);
 
       const client = refs.clientRef.current;
       let messages: ChatMessage[] = [];
@@ -70,7 +71,7 @@ export function useSession(refs: SessionRefs) {
         chatMessages: messages,
       });
     },
-    [refs],
+    [refs, clearTransientState],
   );
 
   const prepareSessionForSeat = useCallback(

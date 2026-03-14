@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, type Dispatch, type MutableRefObject } from "react";
-import type { SeatState, TaskItem, GatewayConfig, ChatMessage } from "@/types/game";
+import type { SeatState, TaskItem, GatewayConfig } from "@/types/game";
 import { GatewayClient } from "../gateway";
 import type { ModelChoice } from "../gateway-handler";
 import { wireGatewayClient } from "../gateway-handler";
@@ -22,13 +22,13 @@ export interface GatewayRefs {
   seats: MutableRefObject<SeatState[]>;
   activeSessionKey: MutableRefObject<string | undefined>;
   setActiveSessionKey: (key?: string) => void;
-  sessionRefreshTimer: MutableRefObject<ReturnType<typeof setTimeout> | null>;
   taskCounter: MutableRefObject<number>;
 }
 
 export function useGateway(refs: GatewayRefs) {
   const clientRef = useRef<GatewayClient | null>(null);
   const configRef = useRef<GatewayConfig>({ url: DEFAULT_URL, token: DEFAULT_TOKEN });
+  const sessionRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const seenStartsRef = useRef(new Set<string>());
   const stoppedRunIdsRef = useRef(new Set<string>());
@@ -61,7 +61,7 @@ export function useGateway(refs: GatewayRefs) {
         bubbleThrottleTimers: bubbleThrottleTimersRef.current,
         runActors: runActorRef.current,
         modelCatalog: modelCatalogRef,
-        sessionRefreshTimer: refs.sessionRefreshTimer,
+        sessionRefreshTimer: sessionRefreshTimerRef,
         taskCounter: refs.taskCounter,
       });
 
@@ -100,9 +100,9 @@ export function useGateway(refs: GatewayRefs) {
   );
 
   const disconnect = useCallback(() => {
-    if (refs.sessionRefreshTimer.current) {
-      clearTimeout(refs.sessionRefreshTimer.current);
-      refs.sessionRefreshTimer.current = null;
+    if (sessionRefreshTimerRef.current) {
+      clearTimeout(sessionRefreshTimerRef.current);
+      sessionRefreshTimerRef.current = null;
     }
     clientRef.current?.disconnect();
     clientRef.current = null;
@@ -121,6 +121,7 @@ export function useGateway(refs: GatewayRefs) {
     bubbleAccumRef,
     bubbleThrottleTimersRef,
     runActorRef,
+    sessionRefreshTimerRef,
     connectImpl,
     connect,
     disconnect,

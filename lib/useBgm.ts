@@ -28,18 +28,20 @@ export interface BgmState {
 }
 
 export function useBgm(): BgmState {
-  const [volume, setVolume] = useState(DEFAULT_BGM_VOLUME);
+  const [volume, setVolume] = useState(() => clampVolume(loadBgmVolume()));
   const volumeRef = useRef(volume);
-  volumeRef.current = volume;
 
   useEffect(() => {
-    const saved = clampVolume(loadBgmVolume());
-    setVolume(saved);
+    volumeRef.current = volume;
+  }, [volume]);
+
+  useEffect(() => {
     const audio = getAudio();
-    audio.volume = saved;
-    if (saved > 0) {
+    audio.volume = volume;
+    if (volume > 0) {
       audio.play().catch(() => {});
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only run on mount
   }, []);
 
   useEffect(() => {

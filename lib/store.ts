@@ -76,7 +76,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   seatsRef.current = state.seats;
   const seatConfigRef = useRef<PersistedSeatConfig[]>([]);
   const activeSessionKeyRef = useRef<string | undefined>(undefined);
-  const sessionRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const taskCounterRef = useRef(0);
 
   const setActiveSessionKey = useCallback((sessionKey?: string) => {
@@ -92,15 +91,19 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     seats: seatsRef,
     activeSessionKey: activeSessionKeyRef,
     setActiveSessionKey,
-    sessionRefreshTimer: sessionRefreshTimerRef,
     taskCounter: taskCounterRef,
   });
+
+  const setActiveSessionKeyDirect = useCallback((key: string | undefined) => {
+    activeSessionKeyRef.current = key;
+  }, []);
 
   // ── Session hook ──
   const session = useSession({
     dispatch: dispatchRef,
     clientRef: gateway.clientRef,
     activeSessionKey: activeSessionKeyRef,
+    setActiveSessionKey: setActiveSessionKeyDirect,
     seenStarts: gateway.seenStartsRef,
     bubbleAccum: gateway.bubbleAccumRef,
     stoppedRunIds: gateway.stoppedRunIdsRef,
@@ -116,7 +119,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     seatIdToSessionKey: session.seatIdToSessionKeyRef,
     stoppedRunIds: gateway.stoppedRunIdsRef,
     runActors: gateway.runActorRef,
-    taskCounter: taskCounterRef,
+    nextTaskId: () => `aw_task_${++taskCounterRef.current}_${Date.now()}`,
   });
 
   // ── Bootstrap: restore persisted state + auto-connect ──
@@ -255,14 +258,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   // ── Cleanup ──
   useEffect(() => {
+    const sessionTimer = gateway.sessionRefreshTimerRef;
+    const bubbleTimers = gateway.bubbleThrottleTimersRef;
+    const client = gateway.clientRef;
     return () => {
-      if (sessionRefreshTimerRef.current) {
-        clearTimeout(sessionRefreshTimerRef.current);
+      if (sessionTimer.current) {
+        clearTimeout(sessionTimer.current);
       }
-      for (const timer of gateway.bubbleThrottleTimersRef.current.values()) {
+      for (const timer of bubbleTimers.current.values()) {
         clearTimeout(timer);
       }
-      gateway.clientRef.current?.disconnect();
+      client.current?.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

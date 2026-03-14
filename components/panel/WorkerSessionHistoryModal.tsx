@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useStudio } from "@/lib/store";
 import { gameEvents } from "@/lib/events";
 import type { ChatMessage } from "@/types/game";
-import { findTask } from "@/lib/reducer";
 import { formatRelativeTime, isVisibleChatMessage } from "@/lib/constants";
 import MessageBubble from "@/components/hud/MessageBubble";
 

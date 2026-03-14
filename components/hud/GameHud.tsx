@@ -24,27 +24,27 @@ export default function GameHud() {
   const bgm = useBgm();
   const [openPanel, setOpenPanel] = useState<HudPanelId | null>(null);
   const [seatManagerOpen, setSeatManagerOpen] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(
+    () => !loadOnboardingDone() && !loadGatewayConfig(),
+  );
 
-  useEffect(() => {
-    if (!loadOnboardingDone() && !loadGatewayConfig()) {
-      setShowOnboarding(true);
-    }
-  }, []);
-
+  // Auto-dismiss onboarding when connection panel opens
   useEffect(() => {
     if (showOnboarding && openPanel === "connection") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to panel open
       setShowOnboarding(false);
       saveOnboardingDone();
     }
   }, [showOnboarding, openPanel]);
 
+  // Auto-open connection panel on auth/connection failures
   useEffect(() => {
     if (
       state.connection === "auth_failed" ||
       state.connection === "unreachable" ||
       state.connection === "rate_limited"
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to connection state
       setOpenPanel("connection");
     } else if (state.connection === "connected") {
       setOpenPanel((prev) => (prev === "connection" ? null : prev));

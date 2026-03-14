@@ -9,7 +9,6 @@ import type {
   ConnectionStatus,
   SeatState,
   SeatType,
-  AgentConfig,
   TaskItem,
   ChatMessage,
   SessionMetrics,

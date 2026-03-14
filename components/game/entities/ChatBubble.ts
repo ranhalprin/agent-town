@@ -13,7 +13,7 @@ export class ChatBubble {
   private fadeTimeout: ReturnType<typeof setTimeout> | null = null;
   private fadeRaf: ReturnType<typeof requestAnimationFrame> | null = null;
 
-  constructor(scene: Phaser.Scene, _depth = 25) {
+  constructor(scene: Phaser.Scene) {
     this.scene = scene;
 
     this.el = document.createElement("div");

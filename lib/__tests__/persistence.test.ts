@@ -1,16 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-import {
-  LS_CONFIG,
-  LS_TASKS,
-  LS_CHAT,
-  LS_SESSIONS,
-  LS_ACTIVE_KEY,
-  LS_SEAT_CONFIG,
-  LS_BGM_VOLUME,
-  LS_ONBOARDING_DONE,
-  DEFAULT_BGM_VOLUME,
-} from "@/lib/constants";
+import { LS_TASKS, LS_CHAT, LS_SESSIONS, LS_ACTIVE_KEY, DEFAULT_BGM_VOLUME } from "@/lib/constants";
 
 import type { GatewayConfig, TaskItem, ChatMessage, SessionRecord } from "@/types/game";
 import type { PersistedSeatConfig } from "@/lib/persistence";
@@ -33,7 +23,7 @@ function createLocalStorageMock() {
     get length() {
       return store.size;
     },
-    key: vi.fn((_index: number) => null),
+    key: vi.fn(() => null),
     _store: store,
   } satisfies Storage & { _store: Map<string, string> };
 }

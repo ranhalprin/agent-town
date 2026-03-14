@@ -1,7 +1,6 @@
 "use client";
 
 import { Square } from "lucide-react";
-import { gameEvents } from "@/lib/events";
 import type { ChatMessage } from "@/types/game";
 import ToolBubble from "./ToolBubble";
 
