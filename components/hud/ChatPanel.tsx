@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { SendHorizontal } from "lucide-react";
 import { useStudio } from "@/lib/store";
 import { gameEvents } from "@/lib/events";
@@ -42,11 +43,18 @@ export default function ChatPanel({
     gameEvents.emit("stop-task", runId, seatId);
   }, []);
 
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 80,
+    overscan: 5,
+  });
+
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (messages.length > 0) {
+      virtualizer.scrollToIndex(messages.length - 1, { align: "end" });
     }
-  }, [messages.length]);
+  }, [messages.length, virtualizer]);
 
   const handleSend = () => {
     const trimmed = input.trim();
@@ -68,9 +76,7 @@ export default function ChatPanel({
     <HudFlyout
       title="Chat"
       subtitle={isConnected ? "Send messages and view execution" : "Connect to start"}
-      headerAction={
-        <SessionSwitcher sessions={sessions} activeKey={activeSessionKey} />
-      }
+      headerAction={<SessionSwitcher sessions={sessions} activeKey={activeSessionKey} />}
       bodyClass="hud-flyout__body--chat"
     >
       <div className="hud-chat-layout">
@@ -78,19 +84,42 @@ export default function ChatPanel({
           {messages.length === 0 ? (
             <div className="hud-empty">No conversation yet. Type a message to begin.</div>
           ) : (
-            messages.map((message) => {
-              const task = findTask(tasks, message.runId);
-              const canStop = task?.status === "running" && (task.runId ?? task.taskId);
-              return (
-                <MessageBubble
-                  key={message.id}
-                  msg={message}
-                  actorName={actorByRunId.get(message.runId)}
-                  canStop={!!canStop}
-                  onStop={canStop ? () => stopHandler(task.runId ?? task.taskId, task.seatId ?? "") : undefined}
-                />
-              );
-            })
+            <div
+              style={{ height: virtualizer.getTotalSize(), width: "100%", position: "relative" }}
+            >
+              {virtualizer.getVirtualItems().map((virtualRow) => {
+                const message = messages[virtualRow.index];
+                const task = findTask(tasks, message.runId);
+                const canStop = task?.status === "running" && (task.runId ?? task.taskId);
+                return (
+                  <div
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    ref={virtualizer.measureElement}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <div style={{ paddingBottom: 8 }}>
+                      <MessageBubble
+                        msg={message}
+                        actorName={actorByRunId.get(message.runId)}
+                        canStop={!!canStop}
+                        onStop={
+                          canStop
+                            ? () => stopHandler(task.runId ?? task.taskId, task.seatId ?? "")
+                            : undefined
+                        }
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 

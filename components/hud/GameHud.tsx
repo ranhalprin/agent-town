@@ -1,5 +1,7 @@
 "use client";
 
+import "./hud.css";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStudio } from "@/lib/store";
 import { isVisibleChatMessage } from "@/lib/constants";
@@ -38,7 +40,11 @@ export default function GameHud() {
   }, [showOnboarding, openPanel]);
 
   useEffect(() => {
-    if (state.connection === "auth_failed" || state.connection === "unreachable" || state.connection === "rate_limited") {
+    if (
+      state.connection === "auth_failed" ||
+      state.connection === "unreachable" ||
+      state.connection === "rate_limited"
+    ) {
       setOpenPanel("connection");
     } else if (state.connection === "connected") {
       setOpenPanel((prev) => (prev === "connection" ? null : prev));
@@ -61,10 +67,30 @@ export default function GameHud() {
   // Top-right toolbar items (everything except chat)
   const toolItems: HudDockItem[] = useMemo(
     () => [
-      { id: "music", label: "Music", icon: "/ui/icons/icon-music.png", iconActive: "/ui/icons/icon-music-active.png" },
-      { id: "connection", label: "Connection", icon: "/ui/icons/icon-connection.png", iconActive: "/ui/icons/icon-connection-active.png" },
-      { id: "tasks", label: "Tasks", icon: "/ui/icons/icon-tasks.png", iconActive: "/ui/icons/icon-tasks-active.png" },
-      { id: "workers", label: "Employees", icon: "/ui/icons/icon-workers.png", iconActive: "/ui/icons/icon-workers-active.png" },
+      {
+        id: "music",
+        label: "Music",
+        icon: "/ui/icons/icon-music.png",
+        iconActive: "/ui/icons/icon-music-active.png",
+      },
+      {
+        id: "connection",
+        label: "Connection",
+        icon: "/ui/icons/icon-connection.png",
+        iconActive: "/ui/icons/icon-connection-active.png",
+      },
+      {
+        id: "tasks",
+        label: "Tasks",
+        icon: "/ui/icons/icon-tasks.png",
+        iconActive: "/ui/icons/icon-tasks-active.png",
+      },
+      {
+        id: "workers",
+        label: "Employees",
+        icon: "/ui/icons/icon-workers.png",
+        iconActive: "/ui/icons/icon-workers-active.png",
+      },
     ],
     [],
   );
@@ -138,7 +164,9 @@ export default function GameHud() {
             title="Chat"
           >
             <img
-              src={openPanel === "chat" ? "/ui/icons/icon-chat-active.png" : "/ui/icons/icon-chat.png"}
+              src={
+                openPanel === "chat" ? "/ui/icons/icon-chat-active.png" : "/ui/icons/icon-chat.png"
+              }
               alt="Chat"
               width={28}
               height={28}
@@ -156,9 +184,7 @@ export default function GameHud() {
         seats={state.seats}
       />
 
-      {showOnboarding && (
-        <OnboardingOverlay onDone={() => setShowOnboarding(false)} />
-      )}
+      {showOnboarding && <OnboardingOverlay onDone={() => setShowOnboarding(false)} />}
     </div>
   );
 }

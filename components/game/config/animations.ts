@@ -49,7 +49,12 @@ export const WORKER_SPRITES: WorkerSpriteConfig[] = [
 const directions = ["right", "up", "left", "down"] as const;
 export type Direction = (typeof directions)[number];
 
-export function makeAnims(spriteKey: string, prefix: string, row: number, frameRate: number): AnimDef[] {
+export function makeAnims(
+  spriteKey: string,
+  prefix: string,
+  row: number,
+  frameRate: number,
+): AnimDef[] {
   return directions.map((dir, i) => ({
     key: `${spriteKey}:${prefix}-${dir}`,
     start: row * SHEET_COLUMNS + i * FRAMES_PER_DIR,

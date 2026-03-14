@@ -1,6 +1,9 @@
 "use client";
 
 import { Component, type ReactNode } from "react";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("ErrorBoundary");
 
 interface Props {
   children: ReactNode;
@@ -19,7 +22,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error("[ErrorBoundary]", error, info.componentStack);
+    log.error(error, info.componentStack);
   }
 
   render() {
@@ -33,9 +36,9 @@ export class ErrorBoundary extends Component<Props, State> {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "#1a1a2e",
-            color: "#ef4444",
-            fontFamily: '"Press Start 2P", monospace',
+            background: "var(--pixel-bg, #1a1814)",
+            color: "var(--pixel-red, #ef4444)",
+            fontFamily: 'var(--pixel-font, "ArkPixel", monospace)',
             fontSize: 12,
             padding: 32,
             textAlign: "center",
@@ -44,7 +47,7 @@ export class ErrorBoundary extends Component<Props, State> {
         >
           <div>
             <div style={{ fontSize: 16, marginBottom: 16 }}>Something went wrong</div>
-            <div style={{ color: "#94a3b8", fontSize: 10 }}>
+            <div style={{ color: "var(--pixel-muted, #a09888)", fontSize: 10 }}>
               {this.state.error.message}
             </div>
             <button
@@ -52,9 +55,10 @@ export class ErrorBoundary extends Component<Props, State> {
               style={{
                 marginTop: 24,
                 padding: "8px 24px",
-                border: "3px solid #0f3460",
-                background: "#16213e",
-                color: "#e2e8f0",
+                border: "3px solid var(--pixel-border, #4a4238)",
+                borderRadius: "var(--pixel-radius-sm, 6px)",
+                background: "var(--pixel-panel-fill, #322c24)",
+                color: "var(--pixel-text, #e8e2d8)",
                 fontFamily: "inherit",
                 fontSize: 10,
                 cursor: "pointer",

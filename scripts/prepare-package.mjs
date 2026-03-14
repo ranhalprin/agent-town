@@ -8,15 +8,7 @@
  * 4. Copy server.prod.mjs → .next/standalone/server.prod.mjs
  */
 
-import {
-  existsSync,
-  readdirSync,
-  statSync,
-  mkdirSync,
-  rmSync,
-  renameSync,
-  cpSync,
-} from "node:fs";
+import { existsSync, readdirSync, statSync, mkdirSync, rmSync, renameSync, cpSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -82,18 +74,13 @@ cpSync(resolve(root, "public"), resolve(standalone, "public"), {
 console.log("  done  public/ → standalone/public/");
 
 // --- 3. Copy .next/static/ ---
-cpSync(
-  resolve(root, ".next", "static"),
-  resolve(standalone, ".next", "static"),
-  { recursive: true }
-);
+cpSync(resolve(root, ".next", "static"), resolve(standalone, ".next", "static"), {
+  recursive: true,
+});
 console.log("  done  .next/static/ → standalone/.next/static/");
 
 // --- 4. Copy server.prod.mjs ---
-cpSync(
-  resolve(root, "server.prod.mjs"),
-  resolve(standalone, "server.prod.mjs")
-);
+cpSync(resolve(root, "server.prod.mjs"), resolve(standalone, "server.prod.mjs"));
 console.log("  done  server.prod.mjs → standalone/server.prod.mjs");
 
 console.log("\n  Standalone package ready.\n");

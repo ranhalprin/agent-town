@@ -13,7 +13,15 @@ function SeatGroup({ title, seats }: { title: string; seats: SeatState[] }) {
   if (seats.length === 0) return null;
   return (
     <div style={{ marginBottom: 8 }}>
-      <div style={{ fontSize: 7, color: "var(--pixel-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+      <div
+        style={{
+          fontSize: 7,
+          color: "var(--pixel-muted)",
+          textTransform: "uppercase",
+          letterSpacing: 1,
+          marginBottom: 6,
+        }}
+      >
         {title}
       </div>
       {seats.map((seat) => (
@@ -31,7 +39,8 @@ function SeatGroup({ title, seats }: { title: string; seats: SeatState[] }) {
           </div>
           <div className="hud-workers__task">
             {seat.assigned
-              ? seat.taskSnippet ?? `${seat.roleTitle ?? (seat.seatType === "agent" ? "Agent" : "Worker")} waiting at desk`
+              ? (seat.taskSnippet ??
+                `${seat.roleTitle ?? (seat.seatType === "agent" ? "Agent" : "Worker")} waiting at desk`)
               : "Assign a crew member to this seat"}
           </div>
         </div>
@@ -48,7 +57,9 @@ export default function WorkerPanel({
   onOpenManager: () => void;
 }) {
   const assigned = seats.filter((s) => s.assigned).length;
-  const working = seats.filter((s) => s.assigned && (s.status === "running" || s.status === "returning")).length;
+  const working = seats.filter(
+    (s) => s.assigned && (s.status === "running" || s.status === "returning"),
+  ).length;
   const agentSeats = seats.filter((s) => s.seatType === "agent");
   const workerSeats = seats.filter((s) => s.seatType !== "agent");
 

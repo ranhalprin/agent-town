@@ -22,7 +22,14 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
-export type GatewayStatus = "disconnected" | "connecting" | "connected" | "error" | "auth_failed" | "unreachable" | "rate_limited";
+export type GatewayStatus =
+  | "disconnected"
+  | "connecting"
+  | "connected"
+  | "error"
+  | "auth_failed"
+  | "unreachable"
+  | "rate_limited";
 
 // ── Reconnect config ───────────────────────────────────
 
@@ -127,7 +134,11 @@ export class GatewayClient {
 
       ws.onerror = () => {
         // Don't overwrite terminal states set by handshake failure
-        if (this._status !== "auth_failed" && this._status !== "unreachable" && this._status !== "rate_limited") {
+        if (
+          this._status !== "auth_failed" &&
+          this._status !== "unreachable" &&
+          this._status !== "rate_limited"
+        ) {
           this.setStatus("error");
         }
         this.rejectConnect(new Error("WebSocket connection error"));
@@ -136,7 +147,11 @@ export class GatewayClient {
       ws.onclose = () => {
         const wasConnected = this._status === "connected";
         // Don't overwrite terminal states set by handshake failure
-        if (this._status !== "auth_failed" && this._status !== "unreachable" && this._status !== "rate_limited") {
+        if (
+          this._status !== "auth_failed" &&
+          this._status !== "unreachable" &&
+          this._status !== "rate_limited"
+        ) {
           this.setStatus("disconnected");
         }
         this.rejectConnect(new Error("Connection closed before handshake"));
@@ -229,9 +244,7 @@ export class GatewayClient {
           }
           pending.resolve(frame);
         } else {
-          pending.reject(
-            new Error(frame.error?.message ?? "Request failed"),
-          );
+          pending.reject(new Error(frame.error?.message ?? "Request failed"));
         }
         return;
       }

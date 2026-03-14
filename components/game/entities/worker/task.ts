@@ -1,12 +1,13 @@
-import {
-  TASK_RESULT_HOLD_MS,
-  TASK_BUBBLE_MS,
-  TASK_THINK_DELAY_MS,
-} from "@/lib/constants";
+import { TASK_RESULT_HOLD_MS, TASK_BUBBLE_MS, TASK_THINK_DELAY_MS } from "@/lib/constants";
 import { isAtHomePose } from "./movement";
 import type { WorkerCtx } from "./types";
 
-export function assignTask(ctx: WorkerCtx, runId: string, taskMessage: string, onReady?: () => void) {
+export function assignTask(
+  ctx: WorkerCtx,
+  runId: string,
+  taskMessage: string,
+  onReady?: () => void,
+) {
   ctx.stopIdleActivity();
   ctx.assignedRunId = runId;
   ctx.currentTaskMessage = taskMessage;

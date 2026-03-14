@@ -57,7 +57,10 @@ export default function ConnectionPanel() {
         <input
           className="pixel-input hud-panel__input"
           value={url}
-          onChange={(event) => { setUrl(event.target.value); setError(""); }}
+          onChange={(event) => {
+            setUrl(event.target.value);
+            setError("");
+          }}
           onKeyDown={handleKeyDown}
           placeholder="ws://127.0.0.1:18789"
           disabled={isConnected || isConnecting}
@@ -67,7 +70,10 @@ export default function ConnectionPanel() {
           className="pixel-input hud-panel__input"
           type="password"
           value={token}
-          onChange={(event) => { setToken(event.target.value); setError(""); }}
+          onChange={(event) => {
+            setToken(event.target.value);
+            setError("");
+          }}
           onKeyDown={handleKeyDown}
           placeholder="optional"
           disabled={isConnected || isConnecting}
@@ -87,9 +93,7 @@ export default function ConnectionPanel() {
             Too many failed attempts. Please wait a moment before retrying.
           </p>
         )}
-        {error && (
-          <p style={{ color: "var(--pixel-red)", fontSize: "8px" }}>{error}</p>
-        )}
+        {error && <p style={{ color: "var(--pixel-red)", fontSize: "8px" }}>{error}</p>}
         {!isConnected && !isConnecting ? (
           <button
             type="button"

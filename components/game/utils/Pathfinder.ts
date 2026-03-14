@@ -19,7 +19,9 @@ class MinHeap<T> {
   private data: T[] = [];
   constructor(private score: (item: T) => number) {}
 
-  get length() { return this.data.length; }
+  get length() {
+    return this.data.length;
+  }
 
   push(item: T) {
     this.data.push(item);
@@ -84,9 +86,9 @@ export class Pathfinder {
     const inflated = collisionRects
       .filter((r) => r.width > 0 && r.height > 0)
       .map((r) => ({
-        left:   r.x - padding,
-        top:    r.y - padding,
-        right:  r.x + r.width + padding,
+        left: r.x - padding,
+        top: r.y - padding,
+        right: r.x + r.width + padding,
         bottom: r.y + r.height + padding,
       }));
 
@@ -97,15 +99,19 @@ export class Pathfinder {
     for (let r = 0; r < this.rows; r++) {
       this.grid[r] = [];
       for (let c = 0; c < this.cols; c++) {
-        const cellLeft   = c * CELL_SIZE;
-        const cellTop    = r * CELL_SIZE;
-        const cellRight  = cellLeft + CELL_SIZE;
-        const cellBottom = cellTop  + CELL_SIZE;
+        const cellLeft = c * CELL_SIZE;
+        const cellTop = r * CELL_SIZE;
+        const cellRight = cellLeft + CELL_SIZE;
+        const cellBottom = cellTop + CELL_SIZE;
 
         let walkable = true;
         for (const rect of inflated) {
-          if (cellRight > rect.left && cellLeft < rect.right &&
-              cellBottom > rect.top && cellTop < rect.bottom) {
+          if (
+            cellRight > rect.left &&
+            cellLeft < rect.right &&
+            cellBottom > rect.top &&
+            cellTop < rect.bottom
+          ) {
             walkable = false;
             break;
           }
@@ -140,15 +146,24 @@ export class Pathfinder {
     }
 
     if (sr === er && sc === ec) {
-      return [{ x: sx, y: sy }, { x: ex, y: ey }];
+      return [
+        { x: sx, y: sy },
+        { x: ex, y: ey },
+      ];
     }
 
     const open = new MinHeap<AStarNode>((n) => n.g + n.h);
     open.push({ r: sr, c: sc, g: 0, h: this.h(sr, sc, er, ec), parent: null });
     const best = new Map<number, number>();
     const DIRS: [number, number][] = [
-      [-1, 0], [1, 0], [0, -1], [0, 1],
-      [-1, -1], [-1, 1], [1, -1], [1, 1],
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+      [-1, -1],
+      [-1, 1],
+      [1, -1],
+      [1, 1],
     ];
 
     let iterations = 0;
@@ -197,9 +212,15 @@ export class Pathfinder {
     return null;
   }
 
-  private toCol(x: number) { return Math.floor(x / CELL_SIZE); }
-  private toRow(y: number) { return Math.floor(y / CELL_SIZE); }
-  private valid(r: number, c: number) { return r >= 0 && r < this.rows && c >= 0 && c < this.cols; }
+  private toCol(x: number) {
+    return Math.floor(x / CELL_SIZE);
+  }
+  private toRow(y: number) {
+    return Math.floor(y / CELL_SIZE);
+  }
+  private valid(r: number, c: number) {
+    return r >= 0 && r < this.rows && c >= 0 && c < this.cols;
+  }
   private h(r1: number, c1: number, r2: number, c2: number) {
     const dr = Math.abs(r1 - r2);
     const dc = Math.abs(c1 - c2);
@@ -246,7 +267,9 @@ export class Pathfinder {
     if (path.length <= 2) return path;
     const result: PathPoint[] = [path[0]];
     for (let i = 1; i < path.length - 1; i++) {
-      const p = path[i - 1], c = path[i], n = path[i + 1];
+      const p = path[i - 1],
+        c = path[i],
+        n = path[i + 1];
       if (c.x - p.x !== n.x - c.x || c.y - p.y !== n.y - c.y) {
         result.push(c);
       }

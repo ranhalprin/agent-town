@@ -34,18 +34,32 @@ export default function SessionSwitcher({
       <button
         type="button"
         className="pixel-button"
-        style={{ fontSize: 7, padding: "3px 8px", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4, maxWidth: 140 }}
+        style={{
+          fontSize: 7,
+          padding: "3px 8px",
+          whiteSpace: "nowrap",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          maxWidth: 140,
+        }}
         onClick={() => setOpen((prev) => !prev)}
         title="Switch session"
       >
         <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{activeLabel}</span>
-        <ChevronDown size={10} style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : undefined }} />
+        <ChevronDown
+          size={10}
+          style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : undefined }}
+        />
       </button>
       <button
         type="button"
         className="pixel-button pixel-button--primary"
         style={{ fontSize: 7, padding: "3px 6px", whiteSpace: "nowrap" }}
-        onClick={() => { newSession(); setOpen(false); }}
+        onClick={() => {
+          newSession();
+          setOpen(false);
+        }}
         title="New session"
       >
         <Plus size={10} />
@@ -63,7 +77,10 @@ export default function SessionSwitcher({
                   key={session.key}
                   type="button"
                   className={`session-dropdown__item ${isActive ? "session-dropdown__item--active" : ""}`}
-                  onClick={() => { switchSession(session.key); setOpen(false); }}
+                  onClick={() => {
+                    switchSession(session.key);
+                    setOpen(false);
+                  }}
                 >
                   <div style={{ fontWeight: isActive ? "bold" : "normal" }}>
                     {session.label ?? session.key.split(":").pop()}

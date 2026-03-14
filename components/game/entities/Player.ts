@@ -1,11 +1,5 @@
 import * as Phaser from "phaser";
-import {
-  SPRITE_KEY,
-  MOVE_SPEED,
-  ALL_ANIMS,
-  FRAME_WIDTH,
-  FRAME_HEIGHT,
-} from "../config/animations";
+import { SPRITE_KEY, MOVE_SPEED, ALL_ANIMS, FRAME_WIDTH, FRAME_HEIGHT } from "../config/animations";
 
 type Direction = "down" | "up" | "left" | "right";
 
@@ -34,12 +28,15 @@ export class Player {
     if (!kb) throw new Error("Keyboard plugin not available");
     this.cursors = kb.createCursorKeys();
     kb.clearCaptures();
-    this.wasd = kb.addKeys({
-      W: Phaser.Input.Keyboard.KeyCodes.W,
-      A: Phaser.Input.Keyboard.KeyCodes.A,
-      S: Phaser.Input.Keyboard.KeyCodes.S,
-      D: Phaser.Input.Keyboard.KeyCodes.D,
-    }, false) as Record<string, Phaser.Input.Keyboard.Key>;
+    this.wasd = kb.addKeys(
+      {
+        W: Phaser.Input.Keyboard.KeyCodes.W,
+        A: Phaser.Input.Keyboard.KeyCodes.A,
+        S: Phaser.Input.Keyboard.KeyCodes.S,
+        D: Phaser.Input.Keyboard.KeyCodes.D,
+      },
+      false,
+    ) as Record<string, Phaser.Input.Keyboard.Key>;
 
     this.sprite.anims.play(`idle-${this.facing}`);
   }

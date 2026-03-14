@@ -48,7 +48,7 @@ export default function WorkerSessionHistoryModal() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const sessionsForSeat = useSessionsForSeat(seatId);
-  const seatLabel = seatId ? state.seats.find((s) => s.seatId === seatId)?.label ?? seatId : "";
+  const seatLabel = seatId ? (state.seats.find((s) => s.seatId === seatId)?.label ?? seatId) : "";
 
   useEffect(() => {
     return gameEvents.on("open-session-history", (sid) => {

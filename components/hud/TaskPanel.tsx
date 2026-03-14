@@ -21,7 +21,7 @@ function taskStatusLabel(status: TaskItem["status"]) {
 
 export default function TaskPanel({ tasks }: { tasks: TaskItem[] }) {
   const runningTasks = tasks.filter((task) =>
-    ["running", "submitted", "queued", "returning"].includes(task.status)
+    ["running", "submitted", "queued", "returning"].includes(task.status),
   );
 
   return (
@@ -33,7 +33,9 @@ export default function TaskPanel({ tasks }: { tasks: TaskItem[] }) {
           tasks.map((task) => (
             <div key={task.taskId} className="hud-list__item">
               <div className="hud-list__top">
-                <span className={`hud-status hud-status--${task.status}`}>{taskStatusLabel(task.status)}</span>
+                <span className={`hud-status hud-status--${task.status}`}>
+                  {taskStatusLabel(task.status)}
+                </span>
                 <span>{formatRelativeTime(task.completedAt ?? task.createdAt)}</span>
               </div>
               <div className="hud-list__title">{task.message}</div>

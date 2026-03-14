@@ -35,7 +35,9 @@ export default function MessageBubble({
       }`}
     >
       <div className="hud-chat__header">
-        <div className="hud-chat__role">{msg.role === "user" ? "You" : msg.actorName ?? actorName ?? "Assistant"}</div>
+        <div className="hud-chat__role">
+          {msg.role === "user" ? "You" : (msg.actorName ?? actorName ?? "Assistant")}
+        </div>
         {canStop && msg.role === "user" && (
           <button
             type="button"

@@ -100,9 +100,7 @@ export default function TerminalModal() {
       >
         {/* Header */}
         <div className="flex items-center justify-between" style={{ marginBottom: "16px" }}>
-          <div style={{ fontSize: "10px" }}>
-            {">"} Terminal
-          </div>
+          <div style={{ fontSize: "10px" }}>{">"} Terminal</div>
           <button
             className="pixel-button"
             style={{ fontSize: "8px", padding: "2px 8px" }}
@@ -149,7 +147,6 @@ export default function TerminalModal() {
             Assign
           </button>
         </div>
-
       </div>
     </div>
   );

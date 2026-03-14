@@ -107,7 +107,13 @@ export function buildCollisionRects(
       const oh = obj.height ?? 0;
       if (ow === 0 || oh === 0) continue;
 
-      const rect = collisionGroup.create(ox + ow / 2, oy + oh / 2, undefined, undefined, false) as Phaser.Physics.Arcade.Sprite;
+      const rect = collisionGroup.create(
+        ox + ow / 2,
+        oy + oh / 2,
+        undefined,
+        undefined,
+        false,
+      ) as Phaser.Physics.Arcade.Sprite;
       rect.body!.setSize(ow, oh);
       rect.setVisible(false);
       rect.setActive(true);
@@ -118,7 +124,10 @@ export function buildCollisionRects(
   }
 
   // Block exterior area so workers never path outside the room
-  let wallMinX = Infinity, wallMinY = Infinity, wallMaxX = 0, wallMaxY = 0;
+  let wallMinX = Infinity,
+    wallMinY = Infinity,
+    wallMaxX = 0,
+    wallMaxY = 0;
   for (const r of collisionRects) {
     wallMinX = Math.min(wallMinX, r.x);
     wallMinY = Math.min(wallMinY, r.y);
@@ -127,10 +136,12 @@ export function buildCollisionRects(
   }
   const mapW = map.widthInPixels;
   const mapH = map.heightInPixels;
-  if (wallMinX > 0)    collisionRects.push({ x: 0, y: 0, width: wallMinX, height: mapH });
-  if (wallMinY > 0)    collisionRects.push({ x: 0, y: 0, width: mapW, height: wallMinY });
-  if (wallMaxX < mapW) collisionRects.push({ x: wallMaxX, y: 0, width: mapW - wallMaxX, height: mapH });
-  if (wallMaxY < mapH) collisionRects.push({ x: 0, y: wallMaxY, width: mapW, height: mapH - wallMaxY });
+  if (wallMinX > 0) collisionRects.push({ x: 0, y: 0, width: wallMinX, height: mapH });
+  if (wallMinY > 0) collisionRects.push({ x: 0, y: 0, width: mapW, height: wallMinY });
+  if (wallMaxX < mapW)
+    collisionRects.push({ x: wallMaxX, y: 0, width: mapW - wallMaxX, height: mapH });
+  if (wallMaxY < mapH)
+    collisionRects.push({ x: 0, y: wallMaxY, width: mapW, height: mapH - wallMaxY });
 
   return collisionRects;
 }

@@ -13,6 +13,7 @@ import type {
   SeatType,
   AgentConfig,
 } from "@/types/game";
+import { createLogger } from "./logger";
 import {
   LS_CONFIG,
   LS_TASKS,
@@ -25,6 +26,8 @@ import {
   DEFAULT_BGM_VOLUME,
   MAX_SESSIONS,
 } from "./constants";
+
+const log = createLogger("Persistence");
 
 export interface PersistedSeatConfig {
   seatId: string;
@@ -53,7 +56,7 @@ export function lsSet(key: string, value: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (err) {
-    console.warn(`[persistence] failed to write "${key}":`, err);
+    log.warn(`failed to write "${key}":`, err);
   }
 }
 

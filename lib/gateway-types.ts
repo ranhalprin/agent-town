@@ -37,10 +37,7 @@ export interface AgentLifecycleError {
   error?: string;
 }
 
-export type AgentLifecycleData =
-  | AgentLifecycleStart
-  | AgentLifecycleEnd
-  | AgentLifecycleError;
+export type AgentLifecycleData = AgentLifecycleStart | AgentLifecycleEnd | AgentLifecycleError;
 
 export interface AgentToolData {
   name?: string;
@@ -128,6 +125,14 @@ export interface ModelsListPayload {
 
 // ── Type guards ────────────────────────────────────────
 
+export function isAgentPayload(payload: unknown): payload is AgentEventPayload {
+  return typeof payload === "object" && payload !== null && "runId" in payload;
+}
+
+export function isChatPayload(payload: unknown): payload is ChatEventPayload {
+  return typeof payload === "object" && payload !== null && "runId" in payload;
+}
+
 export function isLifecycleData(
   stream: string | undefined,
   data: unknown,
@@ -135,10 +140,7 @@ export function isLifecycleData(
   return stream === "lifecycle" && typeof data === "object" && data !== null && "phase" in data;
 }
 
-export function isToolData(
-  stream: string | undefined,
-  data: unknown,
-): data is AgentToolData {
+export function isToolData(stream: string | undefined, data: unknown): data is AgentToolData {
   return stream === "tool" && typeof data === "object" && data !== null;
 }
 

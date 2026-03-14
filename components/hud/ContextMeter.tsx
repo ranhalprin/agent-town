@@ -61,9 +61,7 @@ export default function ContextMeter({
         <span className="hud-meter__label">Context</span>
         <div className="hud-meter__meta">
           <span className="hud-meter__value">
-            {hasValues
-              ? `${formatCompact(maxTokens! - usedTokens!)} left`
-              : "No session"}
+            {hasValues ? `${formatCompact(maxTokens! - usedTokens!)} left` : "No session"}
           </span>
           {!fresh && <span className="hud-meter__stale">stale</span>}
         </div>

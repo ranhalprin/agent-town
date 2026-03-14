@@ -62,7 +62,8 @@ function tryStartWander(ctx: WorkerCtx) {
   const now = ctx.scene.time.now;
   const sinceLast = now - wanderClock.lastStartedAt;
   if (sinceLast < WANDER_STAGGER_MS) {
-    const extraDelay = WANDER_STAGGER_MS - sinceLast + Phaser.Math.Between(STAGGER_EXTRA_MIN, STAGGER_EXTRA_MAX);
+    const extraDelay =
+      WANDER_STAGGER_MS - sinceLast + Phaser.Math.Between(STAGGER_EXTRA_MIN, STAGGER_EXTRA_MAX);
     if (ctx.wanderTimer) ctx.wanderTimer.destroy();
     ctx.wanderTimer = ctx.scene.time.delayedCall(extraDelay, () => {
       tryStartWander(ctx);
@@ -113,7 +114,7 @@ function wanderToPoi(ctx: WorkerCtx) {
 }
 
 function seatActivity(ctx: WorkerCtx) {
-  const def = Phaser.Utils.Array.GetRandom(SEAT_ACTIVITIES) as typeof SEAT_ACTIVITIES[number];
+  const def = Phaser.Utils.Array.GetRandom(SEAT_ACTIVITIES) as (typeof SEAT_ACTIVITIES)[number];
   const duration = Phaser.Math.Between(def.minDuration, def.maxDuration);
 
   ctx.showEmote(def.emote);

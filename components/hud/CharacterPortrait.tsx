@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  FRAME_WIDTH,
-  FRAME_HEIGHT,
-  SHEET_COLUMNS,
-} from "@/components/game/config/animations";
+import { FRAME_WIDTH, FRAME_HEIGHT, SHEET_COLUMNS } from "@/components/game/config/animations";
 
 const PORTRAIT_FRAME_INDEX = SHEET_COLUMNS + 18;
 

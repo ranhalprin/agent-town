@@ -17,12 +17,17 @@ import {
   type SessionsPreviewPayload,
   type ModelsListPayload,
   type ModelChoice,
+  isAgentPayload,
+  isChatPayload,
   isLifecycleData,
   isToolData,
   isAssistantDelta,
 } from "./gateway-types";
 import { gameEvents } from "./events";
 import { chatId, findTask, MAIN_SESSION_KEY, resolveSeatLabelForTask } from "./reducer";
+import { createLogger } from "./logger";
+
+const log = createLogger("Gateway");
 
 const SUBAGENT_KEY_RE = /subagent:/;
 const BUBBLE_THROTTLE_MS = 150;
@@ -48,11 +53,7 @@ function isRunStopped(refs: HandlerRefs, runId: string): boolean {
   return refs.stoppedRunIds.has(runId) || findTask(refs.tasks(), runId)?.status === "stopped";
 }
 
-function resolveRunSessionKey(
-  refs: HandlerRefs,
-  runId: string,
-  sessionKey?: string,
-): string {
+function resolveRunSessionKey(refs: HandlerRefs, runId: string, sessionKey?: string): string {
   return (
     sessionKey ??
     findTask(refs.tasks(), runId)?.sessionKey ??
@@ -61,11 +62,15 @@ function resolveRunSessionKey(
   );
 }
 
-function scheduleSessionMetricsRefresh(
-  refs: HandlerRefs,
-  client: GatewayClient,
-  delayMs = 250,
-) {
+/** Clean up transient per-run state (seen starts, bubble accumulator, stopped IDs, throttle timer). */
+function cleanupRun(refs: HandlerRefs, runId: string) {
+  refs.seenStarts.delete(runId);
+  refs.bubbleAccum.delete(runId);
+  refs.stoppedRunIds.delete(runId);
+  clearBubbleTimer(refs, runId);
+}
+
+function scheduleSessionMetricsRefresh(refs: HandlerRefs, client: GatewayClient, delayMs = 250) {
   if (refs.sessionRefreshTimer.current) {
     clearTimeout(refs.sessionRefreshTimer.current);
   }
@@ -75,10 +80,7 @@ function scheduleSessionMetricsRefresh(
   }, delayMs);
 }
 
-async function loadModelCatalog(
-  refs: HandlerRefs,
-  client: GatewayClient,
-): Promise<ModelChoice[]> {
+async function loadModelCatalog(refs: HandlerRefs, client: GatewayClient): Promise<ModelChoice[]> {
   if (refs.modelCatalog.current) return refs.modelCatalog.current;
   try {
     const response = await client.request("models.list", {});
@@ -134,9 +136,10 @@ async function refreshSessionMetrics(refs: HandlerRefs, client: GatewayClient) {
       refs.setActiveSessionKey(row.key);
       refs.dispatch()({
         type: "SET_SESSIONS",
-        sessions: sessionRecords.length > 0
-          ? sessionRecords
-          : [{ key: row.key, label: "Session 1", createdAt: new Date().toISOString() }],
+        sessions:
+          sessionRecords.length > 0
+            ? sessionRecords
+            : [{ key: row.key, label: "Session 1", createdAt: new Date().toISOString() }],
       });
     }
 
@@ -171,7 +174,7 @@ async function refreshSessionMetrics(refs: HandlerRefs, client: GatewayClient) {
       },
     });
   } catch (error) {
-    console.error("[Gateway] session metrics refresh failed:", error);
+    log.error("session metrics refresh failed:", error);
   }
 }
 
@@ -209,7 +212,8 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
   });
 
   client.on("agent", (payload: unknown) => {
-    const p = payload as AgentEventPayload;
+    if (!isAgentPayload(payload)) return;
+    const p = payload;
     const runId = p.runId;
     if (!runId) return;
 
@@ -217,7 +221,11 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
     const isSubagent = sessionKey ? SUBAGENT_KEY_RE.test(sessionKey) : false;
     const stream = p.stream;
     const data = p.data;
-    const resolvedSessionKey = resolveRunSessionKey(refs, runId, isSubagent ? undefined : sessionKey);
+    const resolvedSessionKey = resolveRunSessionKey(
+      refs,
+      runId,
+      isSubagent ? undefined : sessionKey,
+    );
 
     if (sessionKey && !isSubagent && !refs.activeSessionKey()) {
       refs.setActiveSessionKey(sessionKey);
@@ -240,7 +248,9 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
           dispatch()({
             type: "APPEND_CHAT",
             message: {
-              id: chatId(), runId, role: "system",
+              id: chatId(),
+              runId,
+              role: "system",
               content: `Subagent started: ${label}`,
               timestamp: new Date().toISOString(),
               sessionKey: resolvedSessionKey,
@@ -251,25 +261,27 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
         }
       } else if (data.phase === "end") {
         if (isRunStopped(refs, runId)) {
-          refs.seenStarts.delete(runId);
-          refs.bubbleAccum.delete(runId);
-          clearBubbleTimer(refs, runId);
+          cleanupRun(refs, runId);
           refresh(400);
           return;
         }
         refs.seenStarts.delete(runId);
         refs.bubbleAccum.delete(runId);
+        refs.stoppedRunIds.delete(runId);
         clearBubbleTimer(refs, runId);
         gameEvents.emit("task-completed", runId);
         dispatch()({ type: "SET_SEAT_STATUS", runId, status: "done" });
         dispatch()({
-          type: "UPDATE_TASK", taskId: runId,
+          type: "UPDATE_TASK",
+          taskId: runId,
           patch: { status: "completed", completedAt: new Date().toISOString() },
         });
         dispatch()({
           type: "APPEND_CHAT",
           message: {
-            id: chatId(), runId, role: "system",
+            id: chatId(),
+            runId,
+            role: "system",
             content: "Task completed",
             timestamp: new Date().toISOString(),
             sessionKey: resolvedSessionKey,
@@ -278,24 +290,27 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
         refresh(400);
       } else if (data.phase === "error") {
         if (isRunStopped(refs, runId)) {
-          refs.seenStarts.delete(runId);
-          refs.bubbleAccum.delete(runId);
-          clearBubbleTimer(refs, runId);
+          cleanupRun(refs, runId);
           refresh(400);
           return;
         }
         refs.seenStarts.delete(runId);
         refs.bubbleAccum.delete(runId);
+        refs.stoppedRunIds.delete(runId);
         clearBubbleTimer(refs, runId);
         gameEvents.emit("task-failed", runId);
         dispatch()({ type: "SET_SEAT_STATUS", runId, status: "failed" });
         dispatch()({
-          type: "UPDATE_TASK", taskId: runId, patch: { status: "failed" },
+          type: "UPDATE_TASK",
+          taskId: runId,
+          patch: { status: "failed" },
         });
         dispatch()({
           type: "APPEND_CHAT",
           message: {
-            id: chatId(), runId, role: "system",
+            id: chatId(),
+            runId,
+            role: "system",
             content: `Task error: ${data.error ?? "unknown"}`,
             timestamp: new Date().toISOString(),
             sessionKey: resolvedSessionKey,
@@ -317,7 +332,9 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
         dispatch()({
           type: "APPEND_CHAT",
           message: {
-            id: chatId(), runId, role: "tool",
+            id: chatId(),
+            runId,
+            role: "tool",
             content: toolName,
             sessionKey: resolvedSessionKey,
             toolName,
@@ -349,7 +366,8 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
   });
 
   client.on("chat", (payload: unknown) => {
-    const p = payload as ChatEventPayload;
+    if (!isChatPayload(payload)) return;
+    const p = payload;
     const runId = p.runId;
     if (!runId) return;
     const sessionKey = p.sessionKey;
@@ -368,7 +386,8 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
       const text = content?.find((c) => c.type === "text")?.text;
       dispatch()({ type: "SET_SEAT_STATUS", runId, status: "done" });
       dispatch()({
-        type: "UPDATE_TASK", taskId: runId,
+        type: "UPDATE_TASK",
+        taskId: runId,
         patch: { status: "completed", completedAt: new Date().toISOString(), result: text },
       });
       if (text) {
@@ -394,7 +413,9 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
         dispatch()({
           type: "APPEND_CHAT",
           message: {
-            id: chatId(), runId, role: "system",
+            id: chatId(),
+            runId,
+            role: "system",
             content: stopped ? "Task stopped" : "Task failed",
             timestamp: new Date().toISOString(),
             sessionKey: resolvedSessionKey,
@@ -406,22 +427,27 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
   });
 
   client.onFinalResponse((frame: unknown) => {
+    if (typeof frame !== "object" || frame === null) return;
     const f = frame as GatewayFrame;
-    const runId = (f.payload?.runId as string) ?? undefined;
+    const payload = f.payload;
+    const runId = typeof payload?.runId === "string" ? payload.runId : undefined;
     if (!runId) return;
     if (isRunStopped(refs, runId)) return;
 
-    const status = f.payload?.status as string | undefined;
+    const status = typeof payload?.status === "string" ? payload.status : undefined;
     if (f.ok && (status === "ok" || status === "completed")) {
       dispatch()({ type: "SET_SEAT_STATUS", runId, status: "done" });
       dispatch()({
-        type: "UPDATE_TASK", taskId: runId,
+        type: "UPDATE_TASK",
+        taskId: runId,
         patch: { status: "completed", completedAt: new Date().toISOString() },
       });
       refresh(400);
     } else if (!f.ok || status === "error" || status === "timeout") {
       dispatch()({
-        type: "UPDATE_TASK", taskId: runId, patch: { status: "failed" },
+        type: "UPDATE_TASK",
+        taskId: runId,
+        patch: { status: "failed" },
       });
       dispatch()({ type: "SET_SEAT_STATUS", runId, status: "failed" });
     }
@@ -450,7 +476,7 @@ export async function loadSessionPreview(
     const items = entry.items;
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      const role = item.role === "other" ? "system" as const : item.role;
+      const role = item.role === "other" ? ("system" as const) : item.role;
 
       if (role === "tool") {
         const resultParts: string[] = [];
@@ -482,7 +508,7 @@ export async function loadSessionPreview(
     }
     return messages;
   } catch (err) {
-    console.error("[Gateway] sessions.preview failed:", err);
+    log.error("sessions.preview failed:", err);
     return [];
   }
 }

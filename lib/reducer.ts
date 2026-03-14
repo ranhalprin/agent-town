@@ -70,15 +70,10 @@ export function resolveSeatLabelForTask(seats: SeatState[], seatId?: string) {
   return seatIndex >= 0 ? seats[seatIndex]?.label : undefined;
 }
 
-function mergeSessionChat(
-  existing: ChatMessage[],
-  sessionKey: string,
-  incoming: ChatMessage[],
-) {
-  return [
-    ...existing.filter((msg) => msg.sessionKey !== sessionKey),
-    ...incoming,
-  ].slice(-MAX_CHAT * MAX_SESSIONS);
+function mergeSessionChat(existing: ChatMessage[], sessionKey: string, incoming: ChatMessage[]) {
+  return [...existing.filter((msg) => msg.sessionKey !== sessionKey), ...incoming].slice(
+    -MAX_CHAT * MAX_SESSIONS,
+  );
 }
 
 function resetSeatRuntime(seats: SeatState[]) {
@@ -113,7 +108,9 @@ export function mergeDiscoveredSeats(
     const spritePath = stored?.spritePath ?? fallback?.path;
     const label = stored?.label ?? fallback?.label ?? `Seat ${index + 1}`;
     const seatType: SeatType = stored?.seatType ?? "worker";
-    const roleTitle = stored?.roleTitle ?? (assigned ? (seatType === "agent" ? "Independent Agent" : "Worker") : undefined);
+    const roleTitle =
+      stored?.roleTitle ??
+      (assigned ? (seatType === "agent" ? "Independent Agent" : "Worker") : undefined);
 
     return {
       seatId: seat.seatId,
@@ -150,11 +147,21 @@ export type Action =
   | { type: "ASSIGN_SEAT"; runId: string; taskSnippet: string; seatId?: string }
   | { type: "BIND_SEAT_RUN"; taskId: string; runId: string }
   | { type: "SET_SEAT_STATUS"; runId: string; status: SeatState["status"] }
-  | { type: "PATCH_SEAT_RUNTIME"; seatId: string; patch: Partial<Pick<SeatState, "status" | "taskSnippet" | "runId" | "startedAt">> }
+  | {
+      type: "PATCH_SEAT_RUNTIME";
+      seatId: string;
+      patch: Partial<Pick<SeatState, "status" | "taskSnippet" | "runId" | "startedAt">>;
+    }
   | { type: "SYNC_SEATS"; seats: SeatState[] }
   | { type: "UPDATE_SEAT_CONFIG"; seatId: string; patch: Partial<SeatState> }
   | { type: "RESET_SEATS" }
-  | { type: "RESTORE"; tasks: TaskItem[]; chatMessages: ChatMessage[]; sessions: SessionRecord[]; activeSessionKey?: string }
+  | {
+      type: "RESTORE";
+      tasks: TaskItem[];
+      chatMessages: ChatMessage[];
+      sessions: SessionRecord[];
+      activeSessionKey?: string;
+    }
   | { type: "NEW_SESSION"; session: SessionRecord }
   | { type: "SET_SESSIONS"; sessions: SessionRecord[] }
   | { type: "HYDRATE_SESSION_CHAT"; sessionKey: string; chatMessages: ChatMessage[] }
@@ -314,7 +321,13 @@ export function reducer(state: StudioSnapshot, action: Action): StudioSnapshot {
       const seats: SeatState[] = state.seats.map((seat) => {
         if (seat.runId !== action.runId) return seat;
         if (action.status === "empty") {
-          return { ...seat, status: "empty", runId: undefined, taskSnippet: undefined, startedAt: undefined };
+          return {
+            ...seat,
+            status: "empty",
+            runId: undefined,
+            taskSnippet: undefined,
+            startedAt: undefined,
+          };
         }
         return { ...seat, status: action.status };
       });

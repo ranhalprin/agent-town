@@ -111,9 +111,12 @@ export class InteractionMenu {
       this.container.add(txt);
 
       const hit = this.scene.add.rectangle(
-        MENU_WIDTH / 2, y + ITEM_HEIGHT / 2,
-        MENU_WIDTH, ITEM_HEIGHT,
-        0x000000, 0,
+        MENU_WIDTH / 2,
+        y + ITEM_HEIGHT / 2,
+        MENU_WIDTH,
+        ITEM_HEIGHT,
+        0x000000,
+        0,
       );
       hit.setInteractive({ useHandCursor: opt.enabled });
       hit.on("pointerover", () => {
@@ -157,13 +160,22 @@ export class InteractionMenu {
     const elapsed = this.scene.game.getFrame() - this.openFrame;
     if (elapsed < 2) return;
 
-    if (Phaser.Input.Keyboard.JustDown(this.upKey) || Phaser.Input.Keyboard.JustDown(this.upArrow)) {
+    if (
+      Phaser.Input.Keyboard.JustDown(this.upKey) ||
+      Phaser.Input.Keyboard.JustDown(this.upArrow)
+    ) {
       this.moveSelection(-1);
-    } else if (Phaser.Input.Keyboard.JustDown(this.downKey) || Phaser.Input.Keyboard.JustDown(this.downArrow)) {
+    } else if (
+      Phaser.Input.Keyboard.JustDown(this.downKey) ||
+      Phaser.Input.Keyboard.JustDown(this.downArrow)
+    ) {
       this.moveSelection(1);
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.confirmKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+    if (
+      Phaser.Input.Keyboard.JustDown(this.confirmKey) ||
+      Phaser.Input.Keyboard.JustDown(this.enterKey)
+    ) {
       const opt = this.options[this.selectedIndex];
       if (opt?.enabled) {
         this.hide();
@@ -205,7 +217,10 @@ export class InteractionMenu {
   private clearItems() {
     for (const t of this.items) t.destroy();
     for (const h of this.highlights) h.destroy();
-    for (const z of this.hitZones) { z.removeAllListeners(); z.destroy(); }
+    for (const z of this.hitZones) {
+      z.removeAllListeners();
+      z.destroy();
+    }
     this.items = [];
     this.highlights = [];
     this.hitZones = [];

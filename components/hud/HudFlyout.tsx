@@ -10,7 +10,13 @@ interface HudFlyoutProps {
   bodyClass?: string;
 }
 
-export default function HudFlyout({ title, subtitle, headerAction, children, bodyClass }: HudFlyoutProps) {
+export default function HudFlyout({
+  title,
+  subtitle,
+  headerAction,
+  children,
+  bodyClass,
+}: HudFlyoutProps) {
   return (
     <div className="hud-flyout">
       <div className="hud-flyout__header">

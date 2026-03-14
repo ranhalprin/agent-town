@@ -10,6 +10,9 @@ import { NextResponse } from "next/server";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("agents/discover");
 
 interface DiscoveredAgent {
   agentId: string;
@@ -22,6 +25,17 @@ interface DiscoveredAgent {
 const OPENCLAW_DIR = path.join(os.homedir(), ".openclaw");
 const OPENCLAW_CONFIG = path.join(OPENCLAW_DIR, "openclaw.json");
 const AGENTS_DIR = path.join(OPENCLAW_DIR, "agents");
+
+/** Ensure resolved target is within the allowed base directory. */
+function isSafePath(base: string, target: string): boolean {
+  const resolved = path.resolve(target);
+  return resolved.startsWith(base + path.sep) || resolved === base;
+}
+
+/** Validate agentId: no path separators or traversal. */
+function isValidAgentId(id: string): boolean {
+  return /^[a-zA-Z0-9_-]+$/.test(id) && !id.includes("..");
+}
 
 async function fileExists(p: string): Promise<boolean> {
   try {
@@ -76,7 +90,10 @@ export async function GET() {
 
   try {
     // 1. Read openclaw.json config for agent list entries
-    const configAgents = new Map<string, { workspace?: string; model?: string; identity?: DiscoveredAgent["identity"] }>();
+    const configAgents = new Map<
+      string,
+      { workspace?: string; model?: string; identity?: DiscoveredAgent["identity"] }
+    >();
     let defaultWorkspace: string | undefined;
     let defaultModel: string | undefined;
 
@@ -90,7 +107,7 @@ export async function GET() {
           const list = config?.agents?.list;
           if (Array.isArray(list)) {
             for (const entry of list) {
-              if (entry.id && entry.id !== "main") {
+              if (entry.id && entry.id !== "main" && isValidAgentId(entry.id)) {
                 configAgents.set(entry.id, {
                   workspace: entry.workspace,
                   model: resolveModel(entry.model),
@@ -99,7 +116,9 @@ export async function GET() {
               }
             }
           }
-        } catch { /* ignore parse errors */ }
+        } catch {
+          /* ignore parse errors */
+        }
       }
     }
 
@@ -108,7 +127,7 @@ export async function GET() {
     if (await fileExists(AGENTS_DIR)) {
       const entries = await fs.readdir(AGENTS_DIR, { withFileTypes: true });
       for (const entry of entries) {
-        if (entry.isDirectory() && entry.name !== "main") {
+        if (entry.isDirectory() && entry.name !== "main" && isValidAgentId(entry.name)) {
           agentIds.add(entry.name);
         }
       }
@@ -118,6 +137,7 @@ export async function GET() {
     for (const agentId of agentIds) {
       const configEntry = configAgents.get(agentId);
       const agentDir = path.join(AGENTS_DIR, agentId);
+      if (!isSafePath(AGENTS_DIR, agentDir)) continue;
       const workspace = configEntry?.workspace ?? defaultWorkspace;
 
       // Try to read IDENTITY.md from the agent's workspace
@@ -157,7 +177,7 @@ export async function GET() {
       });
     }
   } catch (err) {
-    console.error("[agents/discover] scan failed:", err);
+    log.error("scan failed:", err);
     return NextResponse.json({ agents: [], error: String(err) }, { status: 500 });
   }
 

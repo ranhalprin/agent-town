@@ -1,9 +1,5 @@
 import * as Phaser from "phaser";
-import {
-  FRAME_WIDTH,
-  FRAME_HEIGHT,
-  MOVE_SPEED,
-} from "../../config/animations";
+import { FRAME_WIDTH, FRAME_HEIGHT, MOVE_SPEED } from "../../config/animations";
 import {
   ARRIVE_THRESHOLD,
   WORKER_SPEED_FACTOR,

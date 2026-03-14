@@ -82,17 +82,72 @@ export interface SeatActivityDef {
 }
 
 export const SEAT_ACTIVITIES: SeatActivityDef[] = [
-  { emote: "emote:sleep",    bubbles: ["Zzz...", "So sleepy...", "*dozing off*"],              minDuration: 6000,  maxDuration: 14000 },
-  { emote: "emote:sleep",    bubbles: ["*stretch*", "*yawn~*", "5 more minutes..."],           minDuration: 4000,  maxDuration: 8000 },
-  { emote: "emote:thinking", bubbles: ["Hmm...", "Let me think...", "How does this work?"],    minDuration: 5000,  maxDuration: 10000 },
-  { emote: "emote:thinking", bubbles: ["Reading docs...", "Taking notes...", "Interesting~"],  minDuration: 5000,  maxDuration: 10000 },
-  { emote: "emote:device",   bubbles: ["Debugging...", "Writing code~", "Fixing bugs..."],    minDuration: 5000,  maxDuration: 12000 },
-  { emote: "emote:device",   bubbles: ["Refactoring~", "Almost done!", "One more test..."],   minDuration: 4000,  maxDuration: 8000 },
-  { emote: "emote:star",     bubbles: ["Got it!", "Eureka!", "Great idea!"],                   minDuration: 2000,  maxDuration: 4000 },
-  { emote: "emote:heart",    bubbles: ["Feeling great!", "Love this~", "Best day ever!"],     minDuration: 3000,  maxDuration: 5000 },
-  { emote: "emote:music",    bubbles: ["~♪♪~", "Humming~", "Good vibes~"],                   minDuration: 3000,  maxDuration: 6000 },
-  { emote: "emote:confused", bubbles: ["Huh?", "This is weird...", "What happened?"],         minDuration: 3000,  maxDuration: 6000 },
-  { emote: "emote:angry",    bubbles: ["Ugh...", "This bug...", "Not again!"],                minDuration: 2000,  maxDuration: 4000 },
+  {
+    emote: "emote:sleep",
+    bubbles: ["Zzz...", "So sleepy...", "*dozing off*"],
+    minDuration: 6000,
+    maxDuration: 14000,
+  },
+  {
+    emote: "emote:sleep",
+    bubbles: ["*stretch*", "*yawn~*", "5 more minutes..."],
+    minDuration: 4000,
+    maxDuration: 8000,
+  },
+  {
+    emote: "emote:thinking",
+    bubbles: ["Hmm...", "Let me think...", "How does this work?"],
+    minDuration: 5000,
+    maxDuration: 10000,
+  },
+  {
+    emote: "emote:thinking",
+    bubbles: ["Reading docs...", "Taking notes...", "Interesting~"],
+    minDuration: 5000,
+    maxDuration: 10000,
+  },
+  {
+    emote: "emote:device",
+    bubbles: ["Debugging...", "Writing code~", "Fixing bugs..."],
+    minDuration: 5000,
+    maxDuration: 12000,
+  },
+  {
+    emote: "emote:device",
+    bubbles: ["Refactoring~", "Almost done!", "One more test..."],
+    minDuration: 4000,
+    maxDuration: 8000,
+  },
+  {
+    emote: "emote:star",
+    bubbles: ["Got it!", "Eureka!", "Great idea!"],
+    minDuration: 2000,
+    maxDuration: 4000,
+  },
+  {
+    emote: "emote:heart",
+    bubbles: ["Feeling great!", "Love this~", "Best day ever!"],
+    minDuration: 3000,
+    maxDuration: 5000,
+  },
+  {
+    emote: "emote:music",
+    bubbles: ["~♪♪~", "Humming~", "Good vibes~"],
+    minDuration: 3000,
+    maxDuration: 6000,
+  },
+  {
+    emote: "emote:confused",
+    bubbles: ["Huh?", "This is weird...", "What happened?"],
+    minDuration: 3000,
+    maxDuration: 6000,
+  },
+  {
+    emote: "emote:angry",
+    bubbles: ["Ugh...", "This bug...", "Not again!"],
+    minDuration: 2000,
+    maxDuration: 4000,
+  },
 ];
 
 // ── POI bubble texts ─────────────────────────────────────

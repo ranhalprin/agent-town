@@ -2,6 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import type * as PhaserTypes from "phaser";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("PhaserGame");
 
 export default function PhaserGame() {
   const gameRef = useRef<PhaserTypes.Game | null>(null);
@@ -26,7 +29,7 @@ export default function PhaserGame() {
     }
 
     initGame().catch((err) => {
-      console.error("[PhaserGame] init failed:", err);
+      log.error("init failed:", err);
     });
 
     return () => {

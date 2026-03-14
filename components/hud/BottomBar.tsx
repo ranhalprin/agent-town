@@ -23,11 +23,7 @@ export default function BottomBar({ connection, sessionMetrics, seats }: BottomB
       <div className="hud-pill hud-pill--connection">
         <span
           className={`pixel-dot pixel-dot--${
-            connection === "connected"
-              ? "green"
-              : connection === "connecting"
-                ? "yellow"
-                : "red"
+            connection === "connected" ? "green" : connection === "connecting" ? "yellow" : "red"
           }`}
         />
         <span>{STATUS_LABELS[connection]}</span>
@@ -46,11 +42,15 @@ export default function BottomBar({ connection, sessionMetrics, seats }: BottomB
       />
       <div className="hud-pill hud-pill--metric">
         <Users size={10} />
-        <span>{assignedSeats}/{totalSeats} seat</span>
+        <span>
+          {assignedSeats}/{totalSeats} seat
+        </span>
       </div>
       <div className="hud-pill hud-pill--metric">
         <Sparkles size={10} />
-        <span>{workingCount}/{assignedSeats} busy</span>
+        <span>
+          {workingCount}/{assignedSeats} busy
+        </span>
       </div>
     </div>
   );

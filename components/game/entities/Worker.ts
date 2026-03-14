@@ -1,13 +1,6 @@
 import * as Phaser from "phaser";
-import {
-  FRAME_HEIGHT,
-  makeAnims,
-  type Direction,
-} from "../config/animations";
-import {
-  EMOTE_SHEET_KEY,
-  EMOTE_ANIMS,
-} from "../config/emotes";
+import { FRAME_HEIGHT, makeAnims, type Direction } from "../config/animations";
+import { EMOTE_SHEET_KEY, EMOTE_ANIMS } from "../config/emotes";
 import { ChatBubble } from "./ChatBubble";
 import type { Pathfinder, PathPoint } from "../utils/Pathfinder";
 import { buildSpriteFrames } from "../utils/MapHelpers";
@@ -20,15 +13,33 @@ import {
 
 // Sub-modules
 import type { WorkerCtx, WorkerStatus, QueuedTask, POI } from "./worker/types";
-import { BODY_WIDTH, BODY_HEIGHT, BODY_OFFSET_X, BODY_OFFSET_Y, updateMovement, navigateTo as movNavigateTo, navigateHome as movNavigateHome, isAtHomePose as movIsAtHomePose } from "./worker/movement";
-import { resetWanderClock, scheduleWander as idleScheduleWander, stopIdleActivity as idleStopIdleActivity } from "./worker/idle";
-import { assignTask as taskAssignTask, completeTask as taskCompleteTask, failTask as taskFailTask, abortTask as taskAbortTask, enqueueTask as taskEnqueueTask } from "./worker/task";
+import {
+  BODY_WIDTH,
+  BODY_HEIGHT,
+  BODY_OFFSET_X,
+  BODY_OFFSET_Y,
+  updateMovement,
+  navigateTo as movNavigateTo,
+  navigateHome as movNavigateHome,
+  isAtHomePose as movIsAtHomePose,
+} from "./worker/movement";
+import {
+  resetWanderClock,
+  scheduleWander as idleScheduleWander,
+  stopIdleActivity as idleStopIdleActivity,
+} from "./worker/idle";
+import {
+  assignTask as taskAssignTask,
+  completeTask as taskCompleteTask,
+  failTask as taskFailTask,
+  abortTask as taskAbortTask,
+  enqueueTask as taskEnqueueTask,
+} from "./worker/task";
 
 export { resetWanderClock };
 export type { WorkerStatus, POI };
 
 export class Worker implements WorkerCtx {
-
   sprite: Phaser.Physics.Arcade.Sprite;
   bubble: ChatBubble;
   readonly seatId: string;
@@ -123,12 +134,7 @@ export class Worker implements WorkerCtx {
       .setOrigin(0.5, 0)
       .setDepth(20);
 
-    this.statusDot = scene.add.circle(
-      x - this.nameTag.width / 2 - 6,
-      nameY + 4,
-      3,
-      0x888888,
-    );
+    this.statusDot = scene.add.circle(x - this.nameTag.width / 2 - 6, nameY + 4, 3, 0x888888);
     this.statusDot.setDepth(20);
 
     this.taskStatusText = scene.add
@@ -374,10 +380,7 @@ export class Worker implements WorkerCtx {
 
     const nameY = this.sprite.y + FRAME_HEIGHT / 2 + 2;
     this.nameTag.setPosition(this.sprite.x, nameY);
-    this.statusDot.setPosition(
-      this.sprite.x - this.nameTag.width / 2 - 6,
-      nameY + 4,
-    );
+    this.statusDot.setPosition(this.sprite.x - this.nameTag.width / 2 - 6, nameY + 4);
 
     const hasTask = this.assignedRunId || this.taskQueue.length > 0;
     if (this.taskStatusText) {
@@ -385,7 +388,10 @@ export class Worker implements WorkerCtx {
       if (hasTask) {
         const parts: string[] = [];
         if (this.currentTaskMessage) {
-          const snip = this.currentTaskMessage.length > 20 ? `${this.currentTaskMessage.slice(0, 20)}...` : this.currentTaskMessage;
+          const snip =
+            this.currentTaskMessage.length > 20
+              ? `${this.currentTaskMessage.slice(0, 20)}...`
+              : this.currentTaskMessage;
           parts.push(`📋 ${snip}`);
         }
         if (this.taskQueue.length > 0) {
@@ -399,28 +405,32 @@ export class Worker implements WorkerCtx {
     }
 
     if (this.emoteSprite) {
-      this.emoteSprite.setPosition(
-        this.sprite.x,
-        this.sprite.y - FRAME_HEIGHT * EMOTE_Y_OFFSET,
-      );
+      this.emoteSprite.setPosition(this.sprite.x, this.sprite.y - FRAME_HEIGHT * EMOTE_Y_OFFSET);
     }
 
     if (this.bubble) {
-      this.bubble.updatePosition(
-        this.sprite.x,
-        this.sprite.y - FRAME_HEIGHT * BUBBLE_Y_OFFSET,
-      );
+      this.bubble.updatePosition(this.sprite.x, this.sprite.y - FRAME_HEIGHT * BUBBLE_Y_OFFSET);
     }
   }
 
   // ── Cleanup ───────────────────────────────────────────
 
   destroy() {
-    if (this.initTimer) { this.initTimer.destroy(); this.initTimer = null; }
+    if (this.initTimer) {
+      this.initTimer.destroy();
+      this.initTimer = null;
+    }
     this.interactionLocked = false;
     this.stopIdleActivity();
-    if (this.taskVisualTimer) { this.taskVisualTimer.destroy(); this.taskVisualTimer = null; }
-    if (this.emoteSprite) { this.emoteSprite.removeAllListeners(); this.emoteSprite.destroy(); this.emoteSprite = null; }
+    if (this.taskVisualTimer) {
+      this.taskVisualTimer.destroy();
+      this.taskVisualTimer = null;
+    }
+    if (this.emoteSprite) {
+      this.emoteSprite.removeAllListeners();
+      this.emoteSprite.destroy();
+      this.emoteSprite = null;
+    }
     this.sprite.destroy();
     this.nameTag.destroy();
     this.taskStatusText.destroy();

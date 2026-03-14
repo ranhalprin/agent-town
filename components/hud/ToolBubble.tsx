@@ -9,7 +9,12 @@ function parseToolParts(msg: ToolChatMessage): { summary: string; detail: string
     try {
       const parsed = JSON.parse(msg.toolInput);
       const hint =
-        parsed.command ?? parsed.path ?? parsed.filename ?? parsed.pattern ?? parsed.query ?? parsed.url;
+        parsed.command ??
+        parsed.path ??
+        parsed.filename ??
+        parsed.pattern ??
+        parsed.query ??
+        parsed.url;
       if (typeof hint === "string") {
         const short = hint.length > 60 ? hint.slice(0, 57) + "..." : hint;
         summary = `${msg.toolName}  ${short}`;
@@ -25,7 +30,14 @@ export default function ToolBubble({ msg }: { msg: ToolChatMessage }) {
 
   return (
     <div className="hud-chat__tool">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 6,
+        }}
+      >
         <div className="hud-chat__tool-name">{summary}</div>
         {detail && (
           <button
@@ -37,9 +49,7 @@ export default function ToolBubble({ msg }: { msg: ToolChatMessage }) {
           </button>
         )}
       </div>
-      {expanded && detail && (
-        <div className="hud-chat__tool-output">{detail}</div>
-      )}
+      {expanded && detail && <div className="hud-chat__tool-output">{detail}</div>}
     </div>
   );
 }

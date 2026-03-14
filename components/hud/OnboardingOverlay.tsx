@@ -1,5 +1,7 @@
 "use client";
 
+import "./onboarding.css";
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useStudio } from "@/lib/store";
 import { saveOnboardingDone } from "@/lib/persistence";
@@ -31,8 +33,12 @@ export default function OnboardingOverlay({ onDone }: Props) {
       if (el) {
         const r = el.getBoundingClientRect();
         setRect((prev) => {
-          if (!prev || Math.abs(prev.x - r.x) > 1 || Math.abs(prev.y - r.y) > 1 ||
-              Math.abs(prev.width - r.width) > 1) {
+          if (
+            !prev ||
+            Math.abs(prev.x - r.x) > 1 ||
+            Math.abs(prev.y - r.y) > 1 ||
+            Math.abs(prev.width - r.width) > 1
+          ) {
             return r;
           }
           return prev;
@@ -121,7 +127,8 @@ export default function OnboardingOverlay({ onDone }: Props) {
             textShadow: "0.5px 0 0 currentColor",
           }}
         >
-          Click here to configure your <strong style={{ color: "var(--pixel-accent)" }}>Gateway</strong> connection
+          Click here to configure your{" "}
+          <strong style={{ color: "var(--pixel-accent)" }}>Gateway</strong> connection
         </p>
         {/* Arrow pointing down */}
         <div
