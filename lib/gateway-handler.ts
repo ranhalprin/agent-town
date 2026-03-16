@@ -93,6 +93,10 @@ async function loadModelCatalog(refs: HandlerRefs, client: GatewayClient): Promi
 
 async function refreshSessionMetrics(refs: HandlerRefs, client: GatewayClient) {
   if (client.status !== "connected") return;
+  if (!client.hasScope("operator.read")) {
+    log.warn("skipping session metrics refresh: missing operator.read scope");
+    return;
+  }
 
   try {
     const response = await client.request("sessions.list", {});
@@ -459,6 +463,7 @@ export async function loadSessionPreview(
   sessionKey: string,
 ): Promise<ChatMessage[]> {
   if (client.status !== "connected") return [];
+  if (!client.hasScope("operator.read")) return [];
 
   try {
     const res = await client.request("sessions.preview", {

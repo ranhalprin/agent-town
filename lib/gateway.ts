@@ -51,6 +51,7 @@ export class GatewayClient {
   private eventListeners = new Map<string, Set<Listener>>();
   private statusListeners = new Set<(s: GatewayStatus) => void>();
   private _status: GatewayStatus = "disconnected";
+  private _grantedScopes: Set<string> = new Set();
   private url: string;
   private token: string;
 
@@ -70,6 +71,10 @@ export class GatewayClient {
 
   get status(): GatewayStatus {
     return this._status;
+  }
+
+  hasScope(scope: string): boolean {
+    return this._grantedScopes.has(scope);
   }
 
   private setStatus(s: GatewayStatus) {
@@ -239,6 +244,7 @@ export class GatewayClient {
 
         if (frame.ok) {
           if (frame.payload?.type === "hello-ok") {
+            this.storeGrantedScopes(frame);
             this.setStatus("connected");
             onConnected?.(frame);
           }
@@ -250,6 +256,7 @@ export class GatewayClient {
       }
 
       if (frame.ok && frame.payload?.type === "hello-ok") {
+        this.storeGrantedScopes(frame);
         this.setStatus("connected");
         onConnected?.(frame);
         return;
@@ -261,6 +268,16 @@ export class GatewayClient {
       const listeners = this.eventListeners.get("__final_res__");
       if (listeners) {
         listeners.forEach((fn) => fn(frame));
+      }
+    }
+  }
+
+  private storeGrantedScopes(frame: GatewayFrame) {
+    this._grantedScopes.clear();
+    const scopes = frame.payload?.scopes;
+    if (Array.isArray(scopes)) {
+      for (const s of scopes) {
+        if (typeof s === "string") this._grantedScopes.add(s);
       }
     }
   }
@@ -354,6 +371,7 @@ export class GatewayClient {
       this.ws.close();
       this.ws = null;
     }
+    this._grantedScopes.clear();
     this.clearPending();
     this.setStatus("disconnected");
   }
