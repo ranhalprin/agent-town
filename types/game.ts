@@ -99,9 +99,12 @@ export interface ToolChatMessage extends ChatMessageBase {
 
 export type ChatMessage = TextChatMessage | ToolChatMessage;
 
+export type AgentProvider = "openclaw" | "auggie";
+
 export interface GatewayConfig {
   url: string;
   token: string;
+  provider?: AgentProvider;
 }
 
 export interface SessionMetrics {

@@ -86,6 +86,11 @@ function resolveModel(model: unknown): string | undefined {
 }
 
 export async function GET() {
+  // When using Auggie provider, agent discovery is not applicable
+  if (process.env.AGENT_PROVIDER === "auggie") {
+    return NextResponse.json({ agents: [] });
+  }
+
   const agents: DiscoveredAgent[] = [];
 
   try {

@@ -40,6 +40,7 @@ function createMockClient() {
 
   return {
     status: "connected" as string,
+    hasScope: vi.fn().mockReturnValue(true),
     on(event: string, fn: Listener) {
       handlers.set(event, fn);
       return () => handlers.delete(event);
