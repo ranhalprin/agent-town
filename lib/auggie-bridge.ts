@@ -9,12 +9,26 @@
 import { type IncomingMessage } from "http";
 import type { Duplex } from "stream";
 import { spawn, type ChildProcess } from "child_process";
+import { writeFileSync, mkdirSync, unlinkSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
 import { WebSocket, WebSocketServer } from "ws";
 import { createLogger } from "./logger";
 
 const log = createLogger("Auggie Bridge");
 
 let runCounter = 0;
+
+/** Lightweight seat info passed to MCP server and prompt context. */
+interface WorkerInfo {
+  seatId: string;
+  label: string;
+  roleTitle?: string;
+}
+
+/** Module-level state so the dispatch endpoint can find active clients. */
+let activeClientState: ClientState | null = null;
+let workerRoster: WorkerInfo[] = [];
 
 interface GatewayFrame {
   type: "req" | "res" | "event";
@@ -119,6 +133,20 @@ function checkOrigin(req: IncomingMessage, socket: Duplex): boolean {
 
 // ── Chat send handler ──────────────────────────────────
 
+function buildWorkerRosterContext(currentSeatLabel?: string): string {
+  if (workerRoster.length <= 1) return "";
+  const others = workerRoster.filter((w) => w.label !== currentSeatLabel);
+  if (others.length === 0) return "";
+  const lines = others.map(
+    (w) => `  • seatId="${w.seatId}" — ${w.label} (${w.roleTitle ?? "Worker"})`,
+  );
+  return (
+    "\n\nYou have team members available. Use the dispatch_to_worker tool to delegate tasks:\n" +
+    lines.join("\n") +
+    "\n"
+  );
+}
+
 function buildPersonalityPrefix(params: Record<string, unknown>): string {
   const label = params.seatLabel as string | undefined;
   const role = params.seatRole as string | undefined;
@@ -126,9 +154,9 @@ function buildPersonalityPrefix(params: Record<string, unknown>): string {
   const parts: string[] = [];
   if (label) parts.push(`Your name is "${label}".`);
   if (role) parts.push(`Your role is ${role}.`);
-  parts.push("You are powered by Auggie.");
-  parts.push("Stay in character when responding.\n\n");
-  return `[${parts.join(" ")}]\n`;
+  parts.push("Stay in character when responding.");
+  const rosterCtx = buildWorkerRosterContext(label);
+  return `[${parts.join(" ")}${rosterCtx}]\n\n`;
 }
 
 function handleChatSend(state: ClientState, id: string, params: Record<string, unknown>) {
@@ -148,6 +176,12 @@ function handleChatSend(state: ClientState, id: string, params: Record<string, u
   // Build auggie command args
   const args = ["--print", "--output-format", "json"];
 
+  // Attach MCP server for worker dispatch if we have a roster
+  const mcpConfigPath = writeMcpConfig();
+  if (mcpConfigPath) {
+    args.push("--mcp-config", mcpConfigPath);
+  }
+
   const existingSessionId = state.sessionMap.get(sessionKey);
   if (existingSessionId) {
     args.push("--resume", existingSessionId);
@@ -157,11 +191,17 @@ function handleChatSend(state: ClientState, id: string, params: Record<string, u
 
   log.info(`Spawning auggie for run ${runId}:`, ["auggie", ...args].join(" "));
 
+  const port = process.env.PORT ?? "3000";
   let child: ChildProcess;
   try {
     child = spawn("auggie", args, {
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env },
+      env: {
+        ...process.env,
+        AGENT_TOWN_PORT: port,
+        AGENT_TOWN_WORKERS: JSON.stringify(workerRoster),
+        AGENT_TOWN_DISPATCH_SECRET: dispatchSecret,
+      },
     });
   } catch (err) {
     const errMsg = `Failed to spawn auggie: ${(err as Error).message}`;
@@ -397,9 +437,213 @@ function handleMessage(state: ClientState, raw: string) {
   }
 }
 
+// ── MCP config helpers ────────────────────────────────
+
+const dispatchSecret = `at_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+let mcpConfigPath: string | null = null;
+
+function getMcpServerPath(): string {
+  // Resolve the MCP server script relative to the project root.
+  // In dev (tsx) process.cwd() is the project root; in prod the server
+  // is started from the package root.  Either way, lib/mcp/ lives there.
+  return join(process.cwd(), "lib", "mcp", "agent-town-mcp.mjs");
+}
+
+/** Write (or reuse) a temporary MCP config file pointing at our stdio server. */
+function writeMcpConfig(): string | null {
+  if (workerRoster.length <= 1) return null; // No point dispatching with 0-1 workers
+  if (mcpConfigPath) return mcpConfigPath;
+  try {
+    const config = {
+      mcpServers: {
+        "agent-town": {
+          command: "node",
+          args: [getMcpServerPath()],
+        },
+      },
+    };
+    const dir = join(tmpdir(), "agent-town-mcp");
+    mkdirSync(dir, { recursive: true });
+    const filePath = join(dir, `mcp-config-${process.pid}.json`);
+    writeFileSync(filePath, JSON.stringify(config), "utf-8");
+    mcpConfigPath = filePath;
+    log.info(`MCP config written to ${filePath}`);
+    return filePath;
+  } catch (err) {
+    log.warn("Failed to write MCP config:", (err as Error).message);
+    return null;
+  }
+}
+
+function cleanupMcpConfig() {
+  if (mcpConfigPath) {
+    try {
+      unlinkSync(mcpConfigPath);
+    } catch {
+      /* ignore */
+    }
+    mcpConfigPath = null;
+  }
+}
+
+// ── Dispatch handler (called from HTTP endpoint) ──────
+
+/**
+ * Dispatch a task to a specific worker seat, spawning a new auggie process.
+ * Returns the result text. Emits subagent-like lifecycle events so the
+ * frontend shows the task animation on the target worker.
+ */
+export function dispatchToWorker(
+  seatId: string,
+  task: string,
+): Promise<{ result: string; error?: string }> {
+  return new Promise((resolve) => {
+    const state = activeClientState;
+    const seat = workerRoster.find((w) => w.seatId === seatId);
+    if (!state || state.ws.readyState !== WebSocket.OPEN) {
+      resolve({ result: "", error: "No active WebSocket client" });
+      return;
+    }
+    if (!seat) {
+      resolve({ result: "", error: `Unknown seatId: ${seatId}` });
+      return;
+    }
+
+    const runId = `auggie_sub_${Date.now()}_${++runCounter}`;
+    const sessionKey = `subagent:dispatch:${seatId}:${runId}`;
+
+    // Build personality for the target worker
+    const prefix = buildPersonalityPrefix({
+      seatLabel: seat.label,
+      seatRole: seat.roleTitle,
+    });
+    const message = prefix + task;
+
+    // Emit lifecycle start so frontend assigns to the target worker
+    sendEvent(state, "agent", {
+      runId,
+      sessionKey,
+      stream: "lifecycle",
+      data: { phase: "start", label: `${seat.label}: ${task.slice(0, 40)}`, seatId },
+    });
+
+    const args = ["--print", "--output-format", "json"];
+
+    // Resume existing session for this seat if available
+    const seatSessionKey = `dispatch:${seatId}`;
+    const existingSessionId = state.sessionMap.get(seatSessionKey);
+    if (existingSessionId) {
+      args.push("--resume", existingSessionId);
+    }
+
+    args.push(message);
+
+    log.info(`Dispatching to ${seat.label} (${seatId}), run ${runId}`);
+
+    let child: ChildProcess;
+    try {
+      child = spawn("auggie", args, {
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env },
+      });
+    } catch (err) {
+      const errMsg = `Failed to spawn auggie for dispatch: ${(err as Error).message}`;
+      log.error(errMsg);
+      sendEvent(state, "agent", {
+        runId,
+        sessionKey,
+        stream: "lifecycle",
+        data: { phase: "error", error: errMsg },
+      });
+      resolve({ result: "", error: errMsg });
+      return;
+    }
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout!.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr!.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+
+    child.on("error", (err) => {
+      log.error(`dispatch process error for run ${runId}:`, err.message);
+      sendEvent(state, "agent", {
+        runId,
+        sessionKey,
+        stream: "lifecycle",
+        data: { phase: "error", error: err.message },
+      });
+      resolve({ result: "", error: err.message });
+    });
+
+    child.on("close", (code) => {
+      if (code !== 0) {
+        const errMsg = stderr.trim() || `auggie exited with code ${code}`;
+        log.error(`dispatch failed for run ${runId}:`, errMsg);
+        sendEvent(state, "agent", {
+          runId,
+          sessionKey,
+          stream: "lifecycle",
+          data: { phase: "error", error: errMsg },
+        });
+        resolve({ result: "", error: errMsg });
+        return;
+      }
+
+      const parsed = parseAuggieOutput(stdout);
+      const responseText = parsed
+        ? typeof parsed.result === "string"
+          ? parsed.result
+          : typeof parsed.response === "string"
+            ? parsed.response
+            : JSON.stringify(parsed)
+        : stdout.trim();
+
+      // Store session for future resume
+      if (parsed && typeof parsed.session_id === "string") {
+        state.sessionMap.set(seatSessionKey, parsed.session_id);
+      }
+
+      // Emit lifecycle end + final chat for frontend
+      sendEvent(state, "agent", {
+        runId,
+        sessionKey,
+        stream: "lifecycle",
+        data: { phase: "end" },
+      });
+      sendEvent(state, "chat", {
+        runId,
+        sessionKey,
+        state: "final",
+        message: { content: [{ type: "text", text: responseText }] },
+      });
+
+      log.info(`Dispatch to ${seat.label} completed (run ${runId})`);
+      resolve({ result: responseText });
+    });
+  });
+}
+
+/** Validate the dispatch secret from an HTTP request. */
+export function validateDispatchSecret(secret: string): boolean {
+  return secret === dispatchSecret;
+}
+
+/** Update the worker roster (called when seat configs change). */
+export function setWorkerRoster(seats: WorkerInfo[]) {
+  workerRoster = seats;
+  mcpConfigPath = null; // Force re-generation if roster changes
+  log.debug(`Worker roster updated: ${seats.length} workers`);
+}
+
 // ── Cleanup ────────────────────────────────────────────
 
 function cleanupClient(state: ClientState) {
+  if (activeClientState === state) activeClientState = null;
   for (const [runId, child] of state.runningProcesses) {
     log.info(`Killing orphaned process for run ${runId}`);
     child.kill("SIGTERM");
@@ -429,6 +673,7 @@ export function attachAuggieBridge(server: import("http").Server, path = "/api/g
         sessionMap: new Map(),
       };
 
+      activeClientState = state;
       log.info("Client connected");
 
       // Send connect challenge immediately
@@ -453,6 +698,8 @@ export function attachAuggieBridge(server: import("http").Server, path = "/api/g
   wss.on("error", (err) => {
     log.error("WebSocketServer error:", err.message);
   });
+
+  process.on("exit", cleanupMcpConfig);
 
   log.info(`Auggie bridge attached on ${path}`);
 }

@@ -244,7 +244,8 @@ export function wireGatewayClient(client: GatewayClient, refs: HandlerRefs) {
             taskSnippet: `[Sub] ${(data.label ?? "sub-task").slice(0, 28)}`,
           });
           const label = data.label ?? "sub-task";
-          gameEvents.emit("subagent-assigned", runId, runId, label);
+          const targetSeatId = "seatId" in data ? (data.seatId as string) : undefined;
+          gameEvents.emit("subagent-assigned", runId, runId, label, targetSeatId);
           refs.runActors.set(runId, label);
           dispatch()({ type: "SET_RUN_ACTOR", runId, actorName: label });
           dispatch()({
