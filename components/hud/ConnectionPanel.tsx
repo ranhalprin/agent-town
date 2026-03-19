@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useStudio } from "@/lib/store";
 import { LS_CONFIG, STATUS_LABELS } from "@/lib/constants";
-import { parseGatewayAddress } from "@/lib/utils";
+import { parseGatewayAddress, getAgentProvider } from "@/lib/utils";
 import HudFlyout from "./HudFlyout";
 
 const DEFAULT_GATEWAY = "ws://127.0.0.1:18789";
 const DEFAULT_TOKEN = process.env.NEXT_PUBLIC_GATEWAY_TOKEN ?? "";
+const IS_AUGGIE = getAgentProvider() === "auggie";
 
 function loadSavedConfig(): { url: string; token: string } {
   try {
@@ -37,6 +38,11 @@ export default function ConnectionPanel() {
 
   const handleConnect = () => {
     setError("");
+    if (IS_AUGGIE) {
+      // Auggie doesn't need a gateway URL or token — connect via local bridge
+      connect({ url: parseGatewayAddress("") ?? "", token: "" });
+      return;
+    }
     const parsed = parseGatewayAddress(url);
     if (!parsed) {
       setError("Invalid URL. Use ws://host:port or host:port.");
@@ -54,33 +60,46 @@ export default function ConnectionPanel() {
   };
 
   return (
-    <HudFlyout title="Connection" subtitle={`${STATUS_LABELS[state.connection]} gateway link`}>
+    <HudFlyout
+      title="Connection"
+      subtitle={`${STATUS_LABELS[state.connection]}${IS_AUGGIE ? " (Auggie)" : " gateway link"}`}
+    >
       <div className="hud-panel__stack">
-        <label className="hud-panel__label">Gateway URL</label>
-        <input
-          className="pixel-input hud-panel__input"
-          value={url}
-          onChange={(event) => {
-            setUrl(event.target.value);
-            setError("");
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="ws://127.0.0.1:18789"
-          disabled={isConnected || isConnecting}
-        />
-        <label className="hud-panel__label">Token</label>
-        <input
-          className="pixel-input hud-panel__input"
-          type="password"
-          value={token}
-          onChange={(event) => {
-            setToken(event.target.value);
-            setError("");
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="optional"
-          disabled={isConnected || isConnecting}
-        />
+        {!IS_AUGGIE && (
+          <>
+            <label className="hud-panel__label">Gateway URL</label>
+            <input
+              className="pixel-input hud-panel__input"
+              value={url}
+              onChange={(event) => {
+                setUrl(event.target.value);
+                setError("");
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="ws://127.0.0.1:18789"
+              disabled={isConnected || isConnecting}
+            />
+            <label className="hud-panel__label">Token</label>
+            <input
+              className="pixel-input hud-panel__input"
+              type="password"
+              value={token}
+              onChange={(event) => {
+                setToken(event.target.value);
+                setError("");
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="optional"
+              disabled={isConnected || isConnecting}
+            />
+          </>
+        )}
+        {IS_AUGGIE && !isConnected && !isConnecting && (
+          <p style={{ color: "var(--pixel-muted)", fontSize: "8px" }}>
+            Using Auggie CLI as agent provider. Make sure <code>auggie</code> is installed and
+            authenticated.
+          </p>
+        )}
         {isAuthFailed && !error && (
           <p style={{ color: "var(--pixel-red)", fontSize: "8px" }}>
             Authentication failed. Token may be invalid or expired — please re-enter.
