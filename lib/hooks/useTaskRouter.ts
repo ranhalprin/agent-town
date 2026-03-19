@@ -48,6 +48,7 @@ export function useTaskRouter(refs: TaskRouterRefs) {
           seatId,
           patch: {
             status: "running",
+            runId: taskId,
             taskSnippet: message.slice(0, 28),
             startedAt: new Date().toISOString(),
           },
