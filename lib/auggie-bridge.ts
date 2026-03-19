@@ -122,10 +122,11 @@ function checkOrigin(req: IncomingMessage, socket: Duplex): boolean {
 function buildPersonalityPrefix(params: Record<string, unknown>): string {
   const label = params.seatLabel as string | undefined;
   const role = params.seatRole as string | undefined;
-  if (!label && !role) return "";
+  if (!label && !role) return "[You are powered by Auggie. Stay in character when responding.]\n\n";
   const parts: string[] = [];
   if (label) parts.push(`Your name is "${label}".`);
   if (role) parts.push(`Your role is ${role}.`);
+  parts.push("You are powered by Auggie.");
   parts.push("Stay in character when responding.\n\n");
   return `[${parts.join(" ")}]\n`;
 }
