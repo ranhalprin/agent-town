@@ -39,6 +39,7 @@ import {
 import { useGateway } from "./hooks/useGateway";
 import { useSession } from "./hooks/useSession";
 import { useTaskRouter } from "./hooks/useTaskRouter";
+import { getAgentProvider, getDefaultGatewayUrl } from "./utils";
 
 // ── Context ────────────────────────────────────────────
 
@@ -165,7 +166,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (t.actorName && t.runId) gateway.runActorRef.current.set(t.runId, t.actorName);
     }
 
-    // Auto-connect if config was saved
+    // Auto-connect: immediately for Auggie (no config needed), or if config was saved for OpenClaw
+    if (getAgentProvider() === "auggie") {
+      const t = setTimeout(
+        () => gateway.connectImpl({ url: getDefaultGatewayUrl(), token: "" }),
+        80,
+      );
+      return () => clearTimeout(t);
+    }
     if (savedConfig?.url) {
       const t = setTimeout(() => gateway.connectImpl(savedConfig), 80);
       return () => clearTimeout(t);
