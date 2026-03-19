@@ -119,10 +119,24 @@ function checkOrigin(req: IncomingMessage, socket: Duplex): boolean {
 
 // ── Chat send handler ──────────────────────────────────
 
+function buildPersonalityPrefix(params: Record<string, unknown>): string {
+  const label = params.seatLabel as string | undefined;
+  const role = params.seatRole as string | undefined;
+  if (!label && !role) return "";
+  const parts: string[] = [];
+  if (label) parts.push(`Your name is "${label}".`);
+  if (role) parts.push(`Your role is ${role}.`);
+  parts.push("Stay in character when responding.\n\n");
+  return `[${parts.join(" ")}]\n`;
+}
+
 function handleChatSend(state: ClientState, id: string, params: Record<string, unknown>) {
   const sessionKey = (params.sessionKey as string) ?? "default";
-  const message = (params.message as string) ?? "";
+  const rawMessage = (params.message as string) ?? "";
   const runId = `auggie_${Date.now()}_${++runCounter}`;
+
+  // Inject personality context from seat config
+  const message = buildPersonalityPrefix(params) + rawMessage;
 
   // Immediate response with runId
   sendResponse(state, id, true, { runId, status: "accepted" });
