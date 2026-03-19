@@ -121,7 +121,7 @@ export default function ConnectionPanel() {
             type="button"
             className="pixel-button pixel-button--primary"
             onClick={handleConnect}
-            disabled={!url.trim()}
+            disabled={!IS_AUGGIE && !url.trim()}
           >
             Connect
           </button>
