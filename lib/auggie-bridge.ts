@@ -9,6 +9,7 @@
 import { type IncomingMessage } from "http";
 import type { Duplex } from "stream";
 import { spawn, type ChildProcess } from "child_process";
+import { randomBytes } from "crypto";
 import { writeFileSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -18,6 +19,12 @@ import { createLogger } from "./logger";
 const log = createLogger("Auggie Bridge");
 
 let runCounter = 0;
+
+/** Maximum bytes to buffer from a single auggie process stdout/stderr. */
+const MAX_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
+
+/** How long (ms) to let an auggie chat process run before killing it. */
+const PROCESS_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 /** Lightweight seat info passed to MCP server and prompt context. */
 interface WorkerInfo {
@@ -221,16 +228,37 @@ function handleChatSend(state: ClientState, id: string, params: Record<string, u
 
   let stdout = "";
   let stderr = "";
+  let stdoutTruncated = false;
 
   child.stdout!.on("data", (chunk: Buffer) => {
+    if (stdoutTruncated) return;
     stdout += chunk.toString();
+    if (stdout.length > MAX_OUTPUT_BYTES) {
+      stdout = stdout.slice(0, MAX_OUTPUT_BYTES);
+      stdoutTruncated = true;
+      log.warn(`stdout truncated at ${MAX_OUTPUT_BYTES} bytes for run ${runId}`);
+    }
   });
 
   child.stderr!.on("data", (chunk: Buffer) => {
-    stderr += chunk.toString();
+    if (stderr.length < MAX_OUTPUT_BYTES) {
+      stderr += chunk.toString();
+      if (stderr.length > MAX_OUTPUT_BYTES) {
+        stderr = stderr.slice(0, MAX_OUTPUT_BYTES);
+      }
+    }
   });
 
+  // Kill process if it exceeds the timeout
+  const timeout = setTimeout(() => {
+    if (state.runningProcesses.has(runId)) {
+      log.warn(`auggie process timed out after ${PROCESS_TIMEOUT_MS}ms for run ${runId}, killing`);
+      child.kill("SIGTERM");
+    }
+  }, PROCESS_TIMEOUT_MS);
+
   child.on("error", (err) => {
+    clearTimeout(timeout);
     log.error(`auggie process error for run ${runId}:`, err.message);
     state.runningProcesses.delete(runId);
     sendEvent(state, "agent", {
@@ -243,6 +271,7 @@ function handleChatSend(state: ClientState, id: string, params: Record<string, u
   });
 
   child.on("close", (code) => {
+    clearTimeout(timeout);
     state.runningProcesses.delete(runId);
 
     if (code === null || code !== 0) {
@@ -440,7 +469,7 @@ function handleMessage(state: ClientState, raw: string) {
 
 // ── MCP config helpers ────────────────────────────────
 
-const dispatchSecret = `at_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+const dispatchSecret = randomBytes(32).toString("hex");
 let mcpConfigPath: string | null = null;
 
 function getMcpServerPath(): string {
@@ -450,16 +479,23 @@ function getMcpServerPath(): string {
   return join(process.cwd(), "lib", "mcp", "agent-town-mcp.mjs");
 }
 
-/** Write (or reuse) a temporary MCP config file pointing at our stdio server. */
+/** Write (or reuse) a temporary MCP config file pointing at our stdio server.
+ *  The config includes env vars so the MCP subprocess can reach the dispatch endpoint. */
 function writeMcpConfig(): string | null {
   if (workerRoster.length <= 1) return null; // No point dispatching with 0-1 workers
-  if (mcpConfigPath) return mcpConfigPath;
+  // Re-write every time so env vars (roster, port) stay current
   try {
+    const port = process.env.PORT ?? "3000";
     const config = {
       mcpServers: {
         "agent-town": {
           command: "node",
           args: [getMcpServerPath()],
+          env: {
+            AGENT_TOWN_PORT: port,
+            AGENT_TOWN_WORKERS: JSON.stringify(workerRoster),
+            AGENT_TOWN_DISPATCH_SECRET: dispatchSecret,
+          },
         },
       },
     };
@@ -602,10 +638,10 @@ export function dispatchToWorker(
           ? parsed.result
           : typeof parsed.response === "string"
             ? parsed.response
-            : JSON.stringify(parsed)
+            : stdout.trim()
         : stdout.trim();
 
-      // Store session for future resume
+      // Store session_id for future resume
       if (parsed && typeof parsed.session_id === "string") {
         state.sessionMap.set(seatSessionKey, parsed.session_id);
       }
