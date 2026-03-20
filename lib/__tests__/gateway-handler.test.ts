@@ -153,6 +153,7 @@ describe("wireGatewayClient", () => {
         expect.anything(),
         expect.anything(),
         expect.anything(),
+        expect.anything(),
       );
     });
 
@@ -193,6 +194,7 @@ describe("wireGatewayClient", () => {
         "sub-1",
         "sub-1",
         "Research",
+        undefined,
       );
 
       const assigns = dispatchCallsOfType(refs, "ASSIGN_SEAT");
@@ -760,6 +762,7 @@ describe("wireGatewayClient", () => {
         "sub-1",
         "sub-1",
         "analyzer",
+        undefined,
       );
     });
 
@@ -777,6 +780,7 @@ describe("wireGatewayClient", () => {
 
       expect(gameEvents.emit).not.toHaveBeenCalledWith(
         "subagent-assigned",
+        expect.anything(),
         expect.anything(),
         expect.anything(),
         expect.anything(),

@@ -101,8 +101,10 @@ export function initSceneEventBridge(
   );
 
   unsubs.push(
-    gameEvents.on("subagent-assigned", (runId, _parentRunId, label) => {
-      const worker = workerManager.findIdle();
+    gameEvents.on("subagent-assigned", (runId, _parentRunId, label, seatId?) => {
+      const worker = seatId
+        ? (workerManager.findBySeatId(seatId) ?? workerManager.findIdle())
+        : workerManager.findIdle();
       if (!worker) return;
       worker.assignTask(runId, `[Sub] ${label}`);
       workerManager.runWorkerMap.set(runId, worker);

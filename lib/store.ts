@@ -262,6 +262,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     seatConfigRef.current = configs;
     saveSeatConfigs(configs);
     gameEvents.emit("seat-configs-updated", state.seats);
+
+    // Sync worker roster to server for auggie MCP dispatch
+    if (typeof window !== "undefined") {
+      fetch("/api/internal/seat-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seats: configs }),
+      }).catch(() => {
+        /* ignore — endpoint only exists in auggie mode */
+      });
+    }
   }, [state.seats]);
 
   // ── Cleanup ──

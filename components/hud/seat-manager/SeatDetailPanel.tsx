@@ -40,6 +40,7 @@ export interface SeatDetailPanelProps {
   onSave: () => void;
   onUnassign: () => void;
   onClose: () => void;
+  isAuggie?: boolean;
 }
 
 export default function SeatDetailPanel({
@@ -62,6 +63,7 @@ export default function SeatDetailPanel({
   onSave,
   onUnassign,
   onClose,
+  isAuggie,
 }: SeatDetailPanelProps) {
   return (
     <div
@@ -166,7 +168,7 @@ export default function SeatDetailPanel({
                       color: "var(--pixel-muted)",
                     }}
                   >
-                    No agents found
+                    {isAuggie ? "Auggie" : "No agents found"}
                   </div>
                 ) : (
                   <select
@@ -226,7 +228,9 @@ export default function SeatDetailPanel({
         {busy
           ? "This seat is currently active. Finish or stop the task before changing crew assignment."
           : effectiveSeatType === "agent"
-            ? "Select an OpenClaw agent, choose a portrait, then save. Agents have their own workspace and session."
+            ? isAuggie
+              ? "Agent seats are not supported with the Auggie provider. Switch to Worker mode to assign tasks."
+              : "Select an OpenClaw agent, choose a portrait, then save. Agents have their own workspace and session."
             : "Select a portrait, set name and role, then save. Workers execute tasks from the main agent."}
       </div>
 
