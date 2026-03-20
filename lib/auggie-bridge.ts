@@ -87,100 +87,6 @@ function sendResponse(
   sendFrame(state, frame);
 }
 
-// ── Auggie text output filter ──────────────────────────
-// Auggie's --print text mode emits tool calls, thinking, emojis, etc.
-// We only want the actual assistant response text streamed to the client.
-
-/** Lines matching these patterns are always skipped. */
-const SKIP_LINE_RE =
-  /^(Applying --max-turns|Request ID:|This error originated|Error: EACCES|    at )/;
-/** Robot emoji marks the start of an assistant response chunk. */
-const ROBOT_EMOJI = "🤖";
-/** Tool call marker. */
-const TOOL_CALL_MARKER = "🔧";
-/** Tool result marker. */
-const TOOL_RESULT_MARKER = "📋";
-
-type FilterMode = "idle" | "response" | "skip";
-
-interface OutputFilterState {
-  mode: FilterMode;
-  lineBuf: string;
-  /** Skip blank lines immediately after the robot emoji. */
-  skipBlanks: boolean;
-}
-
-function createOutputFilter(): OutputFilterState {
-  return { mode: "idle", lineBuf: "", skipBlanks: false };
-}
-
-/**
- * Feed a chunk of text into the filter.  Returns only the text that should
- * be streamed to the client as assistant deltas.
- */
-function filterChunk(fs: OutputFilterState, chunk: string): string {
-  fs.lineBuf += chunk;
-  let out = "";
-
-  // Process complete lines (keeping any trailing partial line in the buffer)
-  let nlIdx: number;
-  while ((nlIdx = fs.lineBuf.indexOf("\n")) !== -1) {
-    const line = fs.lineBuf.slice(0, nlIdx);
-    fs.lineBuf = fs.lineBuf.slice(nlIdx + 1);
-    const trimmed = line.trim();
-
-    // Always skip metadata lines
-    if (SKIP_LINE_RE.test(trimmed)) continue;
-
-    // Robot emoji → start of response text
-    if (trimmed === ROBOT_EMOJI) {
-      fs.mode = "response";
-      fs.skipBlanks = true;
-      continue;
-    }
-
-    // Tool call / tool result → skip until next robot emoji
-    if (trimmed.startsWith(TOOL_CALL_MARKER) || trimmed.startsWith(TOOL_RESULT_MARKER)) {
-      fs.mode = "skip";
-      continue;
-    }
-
-    // Thinking line ("> Thinking: ...")
-    if (trimmed.startsWith(">") && (trimmed.startsWith("> Thinking") || trimmed.startsWith("> "))) {
-      // Stay in current mode, just skip the line
-      continue;
-    }
-
-    if (fs.mode === "skip") continue;
-
-    if (fs.mode === "response") {
-      // Skip blank lines right after the emoji
-      if (fs.skipBlanks) {
-        if (trimmed === "") continue;
-        fs.skipBlanks = false;
-      }
-      out += line + "\n";
-    }
-    // mode === "idle": skip everything before first robot emoji
-  }
-
-  return out;
-}
-
-/** Flush any remaining partial line from the filter buffer. */
-function filterFlush(fs: OutputFilterState): string {
-  if (fs.lineBuf.length === 0) return "";
-  const trimmed = fs.lineBuf.trim();
-  fs.lineBuf = "";
-  if (fs.mode !== "response") return "";
-  if (SKIP_LINE_RE.test(trimmed)) return "";
-  if (trimmed === ROBOT_EMOJI) return "";
-  if (trimmed.startsWith(TOOL_CALL_MARKER) || trimmed.startsWith(TOOL_RESULT_MARKER)) return "";
-  if (trimmed.startsWith(">")) return "";
-  if (trimmed === "") return "";
-  return trimmed;
-}
-
 /**
  * Parse JSON from auggie stdout. The CLI may emit non-JSON diagnostic lines
  * before the actual JSON object, so we search for the first `{` and try to
@@ -206,53 +112,6 @@ function parseAuggieOutput(raw: string): Record<string, unknown> | null {
     }
     return null;
   }
-}
-
-/**
- * Run `auggie session list --json` and return the most recent session_id.
- * Best-effort — returns null on failure.
- */
-async function extractSessionId(): Promise<string | null> {
-  return new Promise((resolve) => {
-    try {
-      const child = spawn("auggie", ["session", "list", "--json"], {
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      let out = "";
-      child.stdout!.on("data", (chunk: Buffer) => {
-        out += chunk.toString();
-      });
-      child.on("error", () => resolve(null));
-      child.on("close", (code) => {
-        if (code !== 0) {
-          resolve(null);
-          return;
-        }
-        try {
-          // auggie session list --json may output an array or object with sessions
-          const parsed = JSON.parse(out.trim());
-          const sessions = Array.isArray(parsed) ? parsed : parsed?.sessions;
-          if (Array.isArray(sessions) && sessions.length > 0) {
-            // Return the most recent session (usually last or first depending on order)
-            const latest = sessions[sessions.length - 1];
-            const sid = latest?.id ?? latest?.session_id;
-            resolve(typeof sid === "string" ? sid : null);
-          } else {
-            resolve(null);
-          }
-        } catch {
-          resolve(null);
-        }
-      });
-      // Timeout after 5s
-      setTimeout(() => {
-        child.kill();
-        resolve(null);
-      }, 5000);
-    } catch {
-      resolve(null);
-    }
-  });
 }
 
 // ── Origin check (same pattern as ws-proxy.ts) ─────────
@@ -322,7 +181,7 @@ function handleChatSend(state: ClientState, id: string, params: Record<string, u
   sendEvent(state, "agent", { runId, sessionKey, stream: "lifecycle", data: { phase: "start" } });
 
   // Build auggie command args
-  const args = ["--print"];
+  const args = ["--print", "--output-format", "json"];
 
   // Attach MCP server for worker dispatch if we have a roster
   const mcpConfigPath = writeMcpConfig();
@@ -367,20 +226,17 @@ function handleChatSend(state: ClientState, id: string, params: Record<string, u
 
   state.runningProcesses.set(runId, child);
 
-  const filter = createOutputFilter();
-  let allResponseText = "";
+  let stdout = "";
   let stderr = "";
+  let stdoutTruncated = false;
 
   child.stdout!.on("data", (chunk: Buffer) => {
-    const filtered = filterChunk(filter, chunk.toString());
-    if (filtered.length > 0) {
-      allResponseText += filtered;
-      sendEvent(state, "agent", {
-        runId,
-        sessionKey,
-        stream: "assistant",
-        data: { delta: filtered },
-      });
+    if (stdoutTruncated) return;
+    stdout += chunk.toString();
+    if (stdout.length > MAX_OUTPUT_BYTES) {
+      stdout = stdout.slice(0, MAX_OUTPUT_BYTES);
+      stdoutTruncated = true;
+      log.warn(`stdout truncated at ${MAX_OUTPUT_BYTES} bytes for run ${runId}`);
     }
   });
 
@@ -431,31 +287,31 @@ function handleChatSend(state: ClientState, id: string, params: Record<string, u
       return;
     }
 
-    // Flush any remaining partial line through the filter
-    const remaining = filterFlush(filter);
-    if (remaining.length > 0) {
-      allResponseText += remaining;
+    const parsed = parseAuggieOutput(stdout);
+    if (!parsed) {
+      log.error(`auggie produced unparseable output for run ${runId}:`, stdout.slice(0, 500));
       sendEvent(state, "agent", {
         runId,
         sessionKey,
-        stream: "assistant",
-        data: { delta: remaining },
+        stream: "lifecycle",
+        data: { phase: "error", error: "Failed to parse auggie output" },
       });
+      sendEvent(state, "chat", { runId, sessionKey, state: "error" });
+      return;
     }
 
-    const responseText = allResponseText.trim();
+    // Store auggie session_id for future resume
+    if (typeof parsed.session_id === "string") {
+      state.sessionMap.set(sessionKey, parsed.session_id);
+      log.debug(`Mapped sessionKey ${sessionKey} → auggie session ${parsed.session_id}`);
+    }
 
-    // Try to extract session_id for resume support by running auggie session list
-    extractSessionId()
-      .then((sid) => {
-        if (sid) {
-          state.sessionMap.set(sessionKey, sid);
-          log.debug(`Mapped sessionKey ${sessionKey} → auggie session ${sid}`);
-        }
-      })
-      .catch(() => {
-        /* best effort */
-      });
+    const responseText =
+      typeof parsed.result === "string"
+        ? parsed.result
+        : typeof parsed.response === "string"
+          ? parsed.response
+          : JSON.stringify(parsed);
 
     // Lifecycle end
     sendEvent(state, "agent", {
@@ -465,7 +321,7 @@ function handleChatSend(state: ClientState, id: string, params: Record<string, u
       data: { phase: "end" },
     });
 
-    // Final chat message (lets the frontend finalize the streamed assistant message)
+    // Final chat message
     sendEvent(state, "chat", {
       runId,
       sessionKey,
@@ -708,7 +564,7 @@ export function dispatchToWorker(
       data: { phase: "start", label: `${seat.label}: ${task.slice(0, 40)}`, seatId },
     });
 
-    const args = ["--print"];
+    const args = ["--print", "--output-format", "json"];
 
     // Resume existing session for this seat if available
     const seatSessionKey = `dispatch:${seatId}`;
@@ -741,21 +597,11 @@ export function dispatchToWorker(
       return;
     }
 
-    const dispatchFilter = createOutputFilter();
-    let allDispatchText = "";
+    let stdout = "";
     let stderr = "";
 
     child.stdout!.on("data", (chunk: Buffer) => {
-      const filtered = filterChunk(dispatchFilter, chunk.toString());
-      if (filtered.length > 0) {
-        allDispatchText += filtered;
-        sendEvent(state, "agent", {
-          runId,
-          sessionKey,
-          stream: "assistant",
-          data: { delta: filtered },
-        });
-      }
+      stdout += chunk.toString();
     });
     child.stderr!.on("data", (chunk: Buffer) => {
       stderr += chunk.toString();
@@ -786,9 +632,19 @@ export function dispatchToWorker(
         return;
       }
 
-      const remaining = filterFlush(dispatchFilter);
-      if (remaining.length > 0) allDispatchText += remaining;
-      const responseText = allDispatchText.trim();
+      const parsed = parseAuggieOutput(stdout);
+      const responseText = parsed
+        ? typeof parsed.result === "string"
+          ? parsed.result
+          : typeof parsed.response === "string"
+            ? parsed.response
+            : stdout.trim()
+        : stdout.trim();
+
+      // Store session_id for future resume
+      if (parsed && typeof parsed.session_id === "string") {
+        state.sessionMap.set(seatSessionKey, parsed.session_id);
+      }
 
       // Emit lifecycle end + final chat for frontend
       sendEvent(state, "agent", {
