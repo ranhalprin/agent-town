@@ -622,16 +622,23 @@ function getMcpServerPath(): string {
   return join(process.cwd(), "lib", "mcp", "agent-town-mcp.mjs");
 }
 
-/** Write (or reuse) a temporary MCP config file pointing at our stdio server. */
+/** Write (or reuse) a temporary MCP config file pointing at our stdio server.
+ *  The config includes env vars so the MCP subprocess can reach the dispatch endpoint. */
 function writeMcpConfig(): string | null {
   if (workerRoster.length <= 1) return null; // No point dispatching with 0-1 workers
-  if (mcpConfigPath) return mcpConfigPath;
+  // Re-write every time so env vars (roster, port) stay current
   try {
+    const port = process.env.PORT ?? "3000";
     const config = {
       mcpServers: {
         "agent-town": {
           command: "node",
           args: [getMcpServerPath()],
+          env: {
+            AGENT_TOWN_PORT: port,
+            AGENT_TOWN_WORKERS: JSON.stringify(workerRoster),
+            AGENT_TOWN_DISPATCH_SECRET: dispatchSecret,
+          },
         },
       },
     };
@@ -732,20 +739,21 @@ export function dispatchToWorker(
       return;
     }
 
-    let stdout = "";
+    const dispatchFilter = createOutputFilter();
+    let allDispatchText = "";
     let stderr = "";
 
     child.stdout!.on("data", (chunk: Buffer) => {
-      const text = chunk.toString();
-      if (text.length > 0) {
+      const filtered = filterChunk(dispatchFilter, chunk.toString());
+      if (filtered.length > 0) {
+        allDispatchText += filtered;
         sendEvent(state, "agent", {
           runId,
           sessionKey,
           stream: "assistant",
-          data: { delta: text },
+          data: { delta: filtered },
         });
       }
-      stdout += text;
     });
     child.stderr!.on("data", (chunk: Buffer) => {
       stderr += chunk.toString();
@@ -776,7 +784,9 @@ export function dispatchToWorker(
         return;
       }
 
-      const responseText = stdout.trim();
+      const remaining = filterFlush(dispatchFilter);
+      if (remaining.length > 0) allDispatchText += remaining;
+      const responseText = allDispatchText.trim();
 
       // Emit lifecycle end + final chat for frontend
       sendEvent(state, "agent", {
