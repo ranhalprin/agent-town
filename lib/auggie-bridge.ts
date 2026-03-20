@@ -335,6 +335,7 @@ function handleChatSend(state: ClientState, id: string, params: Record<string, u
     args.push("--resume", existingSessionId);
   }
 
+  args.push("--");
   args.push(message);
 
   log.info(`Spawning auggie for run ${runId}:`, ["auggie", ...args].join(" "));
@@ -716,6 +717,7 @@ export function dispatchToWorker(
       args.push("--resume", existingSessionId);
     }
 
+    args.push("--");
     args.push(message);
 
     log.info(`Dispatching to ${seat.label} (${seatId}), run ${runId}`);
